@@ -845,18 +845,65 @@ export default class AnimationDigitalNetwork implements ServiceClass {
           });
           sxData.language = subLang;
           if(options.dlsubs.includes('all') || options.dlsubs.includes(subLang.locale)) {
-            let subBody = '[Script Info]'
-          + '\nScriptType:V4.00+'
-          + '\nWrapStyle: 0'
-          + '\nPlayResX: 1280'
-          + '\nPlayResY: 720'
-          + '\nScaledBorderAndShadow: yes'
-          + ''
-          + '\n[V4+ Styles]'
-          + '\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding'
-          + `\nStyle: Default,${options.fontName ?? 'Arial'},${options.fontSize ?? 50},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1.95,0,2,0,0,70,0`
-          + '\n[Events]'
-          + '\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+
+            let subBody = '';
+            if (options.customStyles) {
+              const assParams = options.customStyles;
+              subBody =
+                '[Script Info]' +
+                '\nScriptType:V4.00+' +
+                '\nWrapStyle: 0' +
+                `\nPlayResX: ${assParams.PlayResX}` +
+                `\nPlayResY: ${assParams.PlayResY}` +
+                '\nYCbCr Matrix: TV.709' +
+                '\nCollisions: Normal' +
+                `\nScaledBorderAndShadow: ${
+                  assParams.ScaledBorderAndShadow || 'yes'
+                }` +
+                '\n' +
+                '\n[V4+ Styles]' +
+                '\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding';
+              if (assParams.useStylesForPositionAligns) {
+                subBody +=
+                  `\nStyle: Default,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},2,200,200,${assParams.verticalMargin},1` +
+                  `\nStyle: ST_DOWN_LEFT,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},1,200,0,${assParams.verticalMargin},1` +
+                  `\nStyle: ST_DOWN_RIGHT,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},3,0,200,${assParams.verticalMargin},1` +
+                  `\nStyle: ST_UP,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},8,200,200,${assParams.verticalMargin},1` +
+                  `\nStyle: ST_UP_LEFT,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},7,200,0,${assParams.verticalMargin},1` +
+                  `\nStyle: ST_UP_ALT,${assParams.fontName},${
+                    assParams.textSize
+                  },${assParams.textColor},&H000000FF,${
+                    assParams.borderColor
+                  },&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${
+                    assParams.shadowSize
+                  },2,200,200,${assParams.verticalMargin * 2},1` +
+                  `\nStyle: ST_UP_RIGHT,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},9,0,200,${assParams.verticalMargin},1` +
+                  '\n' +
+                  '\n[Events]' +
+                  '\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+              } else {
+                subBody +=
+                  `\nStyle: Default,${assParams.fontName},${assParams.textSize},${assParams.textColor},&H000000FF,${assParams.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${assParams.borderSize},${assParams.shadowSize},2,200,200,${assParams.verticalMargin},1` +
+                  '\n\n[Events]' +
+                  '\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+              }
+            } else {
+              subBody =
+                '[Script Info]' +
+                '\nScriptType:V4.00+' +
+                '\nWrapStyle: 0' +
+                '\nPlayResX: 1280' +
+                '\nPlayResY: 720' +
+                '\nScaledBorderAndShadow: yes' +
+                '' +
+                '\n[V4+ Styles]' +
+                '\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding' +
+                `\nStyle: Default,${options.fontName ?? 'Arial'},${
+                  options.fontSize ?? 50
+                },&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1.95,0,2,0,0,70,0` +
+                '\n[Events]' +
+                '\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+            }
 
             for (const sub of subtitles[subName]) {
               const [start, end, text, lineAlign, positionAlign] = 
@@ -890,8 +937,37 @@ export default class AnimationDigitalNetwork implements ServiceClass {
                 .replace(/&amp;/g, '&')
                 .replace(/<[^>]>/g, '')
                 .replace(/\\N$/, '')
-                .replace(/ +$/, '');
-              subBody += `\nDialogue: 0,${this.convertToSSATimestamp(start)},${this.convertToSSATimestamp(end)},Default,,0,0,0,,${(alignment !== 2 ? `{\\a${alignment}}` : '')}${xtext}`;
+                .replace(/ +$/, '')
+                .replace(/\- /g, '– ')
+                .replace(/\'/g, '’')
+                .replace(/\.\.\./g, '…');
+
+              if (options.customStyles?.useStylesForPositionAligns) {
+                const styleNames: { [key: number]: string } = {
+                  1: 'ST_DOWN_LEFT',
+                  2: 'Default',
+                  3: 'ST_DOWN_RIGHT',
+                  4: 'ST_UP_LEFT',
+                  5: 'ST_UP_LEFT',
+                  6: 'ST_UP',
+                  7: 'ST_UP_RIGHT',
+                  8: 'ST_UP_LEFT',
+                  9: 'ST_UP_ALT',
+                  10: 'ST_UP_ALT',
+                  11: 'ST_UP_ALT'
+                };
+                subBody += `\nDialogue: 0,${this.convertToSSATimestamp(
+                  start
+                )},${this.convertToSSATimestamp(end)},${
+                  styleNames[alignment]
+                },,0,0,0,,${xtext}`;
+              } else {
+                subBody += `\nDialogue: 0,${this.convertToSSATimestamp(
+                  start
+                )},${this.convertToSSATimestamp(end)},Default,,0,0,0,,${
+                  alignment !== 2 ? `{\\a${alignment}}` : ''
+                }${xtext}`;
+              }
             }
             sxData.title = `${subLang.language}`;
             sxData.fonts = fontsData.assFonts(subBody) as Font[];

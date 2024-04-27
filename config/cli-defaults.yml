@@ -22,3 +22,16 @@ dubLang: ["jpn"]
 dlsubs: ["all"]
 # What language Audio to set as default
 defaultAudio: "jpn"
+# Custom styles in subs
+customStyles:
+  PlayResX: 1920
+  PlayResY: 1080
+  ScaledBorderAndShadow: yes
+  fontName: "Verdana"
+  textSize: 55.5
+  textColor: "&H00FFFFFF"
+  borderColor: "&H00282828"
+  borderSize: 3.75
+  shadowSize: 0
+  verticalMargin: 79
+  useStylesForPositionAligns: true

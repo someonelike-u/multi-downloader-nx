@@ -77,7 +77,22 @@ let argvC: {
   originalFontSize: boolean;
   keepAllVideos: boolean;
   syncTiming: boolean;
+  customStyles?: customStyleParams;
   callbackMaker?: (data: DownloadInfo) => HLSCallback;
+};
+
+type customStyleParams = {
+  PlayResX: number;
+  PlayResY: number;
+  ScaledBorderAndShadow: 'yes' | 'no';
+  fontName: string;
+  textSize: number;
+  textColor: string;
+  borderColor: string;
+  borderSize: number;
+  shadowSize: number;
+  verticalMargin: number;
+  useStylesForPositionAligns?: boolean;
 };
     
 export type ArgvType = typeof argvC;  
@@ -145,7 +160,7 @@ const getArgv = (cfg: { [key:string]: unknown }, isGUI: boolean) => {
       },
       choices: item.name === 'service' && isGUI ? undefined : item.choices as unknown as Choices
     });
-
+  
   // Custom logic for suggesting corrections for misspelled options
   argv.middleware((argv: Record<string, any>) => {
     // List of valid options

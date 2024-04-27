@@ -582,6 +582,18 @@ const args: TAppArg<boolean|number|string|unknown[]>[] = [
     usage: '${fontName}',
   },
   {
+    name: 'customStyles',
+    group: 'fonts',
+    describe: 'Use custom styles in your ADN subtitles',
+    docDescribe: true,
+    service: ['adn'],
+    default: {
+      default: ''
+    },
+    type: 'string',
+    usage: '${customStyles}'
+  },
+  {
     name: 'but',
     describe: 'Download everything but the -e selection',
     docDescribe: true,
