@@ -1,3 +1,8 @@
+# Changes in this fork:
+
+- Use custom styles for ADN subs in CLI and GUI -> see an exemple in the end of the [cli-default.yml](https://github.com/someonelike-u/multi-downloader-nx/blob/master/config/cli-defaults.yml)
+
+
 # Anime Downloader NX by AniDL
 
 [![Discord Shield](https://discord.com/api/guilds/884479461997805568/widget.png?style=banner2)](https://discord.gg/qEpbWen5vq)
