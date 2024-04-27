@@ -1,7 +1,32 @@
 # Changes in this fork:
 
-- Use custom styles for ADN subs in CLI and GUI -> see an exemple in the end of the [cli-default.yml](https://github.com/someonelike-u/multi-downloader-nx/blob/master/config/cli-defaults.yml)
+- Add options to custom styles for ADN subs in CLI and GUI -> see an exemple in the end of the [cli-default.yml](https://github.com/someonelike-u/multi-downloader-nx/blob/master/config/cli-defaults.yml)
 
+   These options match to these first lines in your file subs:
+  ```js
+  [Script Info]
+  ScriptType:V4.00+
+  WrapStyle: 0
+  PlayResX: ${customStyles.PlayResX}
+  PlayResY: ${customStyles.PlayResY}
+  YCbCr Matrix: TV.709
+  Collisions: Normal
+  ScaledBorderAndShadow: ${customStyles.ScaledBorderAndShadow}
+  [V4+ Styles]
+  Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+  Style: Default,${customStyles.fontName},${customStyles.textSize},${customStyles.textColor},&H000000FF,${customStyles.borderColor},&H00000000,-1,0,0,0,100,100,0,0,1,${customStyles.borderSize},${customStyles.shadowSize},2,200,200,${customStyles.verticalMargin},1
+  ```
+  `customStyles.useStylesForPositionAligns` is a boolean (`true` or `false`) to set differents style names by positions align:
+  
+  ```js
+  Style: Default
+  Style: ST_DOWN_LEFT
+  Style: ST_DOWN_RIGHT
+  Style: ST_UP
+  Style: ST_UP_LEFT
+  Style: ST_UP_ALT
+  Style: ST_UP_RIGHT
+  ```
 
 # Anime Downloader NX by AniDL
 
