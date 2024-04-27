@@ -1,6 +1,22 @@
 # Changes in this fork:
 
-- Add options to custom styles for ADN subs in CLI and GUI -> see an exemple in the end of the [cli-default.yml](https://github.com/someonelike-u/multi-downloader-nx/blob/master/config/cli-defaults.yml)
+- Add options to custom styles for ADN subs in CLI and GUI -> set by default in the [cli-default.yml](https://github.com/someonelike-u/multi-downloader-nx/blob/master/config/cli-defaults.yml)
+
+   ```yml
+   # Custom styles in subs
+   customStyles:
+     PlayResX: 1920
+     PlayResY: 1080
+     ScaledBorderAndShadow: yes
+     fontName: "Verdana"
+     textSize: 55.5
+     textColor: "&H00FFFFFF"
+     borderColor: "&H00282828"
+     borderSize: 3.75
+     shadowSize: 0
+     verticalMargin: 79
+     useStylesForPositionAligns: true
+   ```
 
    These options match to these first lines in your file subs:
   ```js
