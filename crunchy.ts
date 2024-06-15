@@ -1214,12 +1214,12 @@ export default class Crunchy implements ServiceClass {
       await this.refreshToken(true, true);
       let currentVersion;
       let isPrimary = mMeta.isSubbed;
-      const AuthHeaders = {
+      const AuthHeaders: RequestInit = {
         headers: {
           Authorization: `Bearer ${this.token.access_token}`,
-          'X-Cr-Disable-Drm': 'true'
-        },
-        useProxy: true
+          'X-Cr-Disable-Drm': 'true',
+          'User-Agent': 'Crunchyroll/1.8.0 Nintendo Switch/12.3.12.0 UE4/4.27'
+        }
       };
 
       //Get Media GUID
@@ -1414,21 +1414,22 @@ export default class Crunchy implements ServiceClass {
         pbData = await playbackReq.res.json() as PlaybackData;
       }
 
+      let switchStream: CrunchyPlayStream | null = null;
       const playbackReq = await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/${currentVersion ? currentVersion.guid : currentMediaId}/console/switch/play`, AuthHeaders);
-      if(!playbackReq.ok || !playbackReq.res){
+      if(!playbackReq.ok || !playbackReq.res) {
         console.error('Non-DRM Request Stream URLs FAILED!');
       } else {
-        const playStream = await playbackReq.res.json() as CrunchyPlayStream;
+        switchStream = await playbackReq.res.json() as CrunchyPlayStream;
         const derivedPlaystreams = {} as CrunchyStreams;
-        for (const hardsub in playStream.hardSubs) {
-          const stream = playStream.hardSubs[hardsub];
+        for (const hardsub in switchStream.hardSubs) {
+          const stream = switchStream.hardSubs[hardsub];
           derivedPlaystreams[hardsub] = {
             url: stream.url,
             'hardsub_locale': stream.hlang
           };
         }
         derivedPlaystreams[''] = {
-          url: playStream.url,
+          url: switchStream.url,
           hardsub_locale: ''
         };
         pbData.data[0]['adaptive_switch_dash'] = {
@@ -1460,7 +1461,7 @@ export default class Crunchy implements ServiceClass {
         console.warn('Decryption not enabled!');
       }
 
-      for(const s of Object.keys(pbStreams)){
+      for (const s of Object.keys(pbStreams)) {
         if (
           (s.match(/hls/) || s.match(/dash/)) 
           && !(s.match(/hls/) && s.match(/drm/)) 
@@ -1483,7 +1484,7 @@ export default class Crunchy implements ServiceClass {
         }
       }
 
-      if(streams.length < 1){
+      if (streams.length < 1) {
         console.warn('No full streams found!');
         return undefined;
       }
@@ -1522,8 +1523,7 @@ export default class Crunchy implements ServiceClass {
           }
           dlFailed = true;
         }
-      }
-      else{
+      } else {
         streams = streams.filter((s) => {
           if(s.hardsub_lang != '-'){
             return false;
@@ -1543,7 +1543,7 @@ export default class Crunchy implements ServiceClass {
       let curStream:
         undefined|typeof streams[0]
         = undefined;
-      if(!dlFailed){
+      if (!dlFailed) {
         options.kstream = typeof options.kstream == 'number' ? options.kstream : 1;
         options.kstream = options.kstream > streams.length ? 1 : options.kstream;
 
@@ -1746,7 +1746,7 @@ export default class Crunchy implements ServiceClass {
               const sessionId = new Date().getUTCMilliseconds().toString().padStart(3, '0') + process.hrtime.bigint().toString().slice(0, 13);
               console.info('Decryption Needed, attempting to decrypt');
 
-              const decReq = await this.req.getData('https://pl.crunchyroll.com/drm/v1/auth', {
+              const decReq = await this.req.getData(`${api.drm}`, {
                 'method': 'POST',
                 'body': JSON.stringify({
                   'accounting_id': 'crunchyroll',
@@ -2127,10 +2127,15 @@ export default class Crunchy implements ServiceClass {
         else{
           console.warn('Can\'t find urls for subtitles!');
         }
-      }
-      else{
+      } else{
         console.info('Subtitles downloading skipped!');
       }
+
+      if (switchStream) {
+        await this.refreshToken(true, true);
+        await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${switchStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+      }
+
       await this.sleep(options.waittime);
     }
     return {
