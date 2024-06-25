@@ -44,6 +44,7 @@ import { CrunchyAndroidObject } from './@types/crunchyAndroidObject';
 import { CrunchyChapters, CrunchyChapter, CrunchyOldChapter } from './@types/crunchyChapters';
 import vtt2ass from './modules/module.vtt2ass';
 import { CrunchyPlayStream } from './@types/crunchyPlayStreams';
+import { CrunchyPlayStreams } from './@types/enums';
 
 export type sxItem = {
   language: langsData.LanguageItem,
@@ -232,7 +233,7 @@ export default class Crunchy implements ServiceClass {
     }).toString();
     const authReqOpts: reqModule.Params = {
       method: 'POST',
-      headers: api.crunchyAuthHeaderSwitch,
+      headers: api.crunchyAuthHeaderMob,
       body: authData
     };
     const authReq = await this.req.getData(api.beta_auth, authReqOpts);
@@ -255,7 +256,7 @@ export default class Crunchy implements ServiceClass {
     }).toString();
     const authReqOpts: reqModule.Params = {
       method: 'POST',
-      headers: api.crunchyAuthHeaderSwitch,
+      headers: api.crunchyAuthHeaderMob,
       body: authData
     };
     const authReq = await this.req.getData(api.beta_auth, authReqOpts);
@@ -299,13 +300,14 @@ export default class Crunchy implements ServiceClass {
 
   public async loginWithToken(refreshToken: string) {
     const authData = new URLSearchParams({
-      'refresh_token': refreshToken,
+      'refresh_token': this.token.refresh_token,
       'grant_type': 'refresh_token',
+      //'grant_type': 'etp_rt_cookie',
       'scope': 'offline_access'
     }).toString();
     const authReqOpts: reqModule.Params = {
       method: 'POST',
-      headers: api.crunchyAuthHeaderSwitch,
+      headers: {...api.crunchyAuthHeaderMob, Cookie: `etp_rt=${refreshToken}`},
       body: authData
     };
     const authReq = await this.req.getData(api.beta_auth, authReqOpts);
@@ -338,11 +340,12 @@ export default class Crunchy implements ServiceClass {
       const authData = new URLSearchParams({
         'refresh_token': this.token.refresh_token,
         'grant_type': 'refresh_token',
+        //'grant_type': 'etp_rt_cookie',
         'scope': 'offline_access'
       }).toString();
       const authReqOpts: reqModule.Params = {
         method: 'POST',
-        headers: api.crunchyAuthHeaderSwitch,
+        headers: {...api.crunchyAuthHeaderMob, Cookie: `etp_rt=${this.token.refresh_token}`},
         body: authData
       };
       const authReq = await this.req.getData(api.beta_auth, authReqOpts);
@@ -613,8 +616,8 @@ export default class Crunchy implements ServiceClass {
     if(item.hide_metadata){
       iMetadata.hide_metadata = item.hide_metadata;
     }
-    const showObjectMetadata = oMetadata.length > 0 && !iMetadata.hide_metadata ? true : false;
-    const showObjectBooleans = oBooleans.length > 0 && !iMetadata.hide_metadata ? true : false;
+    const showObjectMetadata = oMetadata.length > 0 && !iMetadata.hide_metadata;
+    const showObjectBooleans = oBooleans.length > 0 && !iMetadata.hide_metadata;
     // make obj ids
     const objects_ids: string[] = [];
     objects_ids.push(oTypes[item.type as keyof typeof oTypes] + ':' + item.id);
@@ -669,7 +672,7 @@ export default class Crunchy implements ServiceClass {
       console.info(
         '%s- Availability notes: %s',
         ''.padStart(pad + 2, ' '),
-        item.availability_notes.replace(/\[[^\]]*\]?/gm, '')
+        item.availability_notes.replace(/\[[^\]]*]?/gm, '')
       );
     }
     if(item.type == 'series' && getSeries){
@@ -752,7 +755,7 @@ export default class Crunchy implements ServiceClass {
       return;
     }
     for(const item of movieListing.data){
-      this.logObject(item, pad, false, false);
+      await this.logObject(item, pad, false, false);
     }
 
     //Movies
@@ -763,7 +766,7 @@ export default class Crunchy implements ServiceClass {
     }
     const moviesList = await moviesListReq.res.json();
     for(const item of moviesList.data){
-      this.logObject(item, pad+2);
+      await this.logObject(item, pad + 2);
     }
   }
 
@@ -821,7 +824,7 @@ export default class Crunchy implements ServiceClass {
       return { isOk: false, reason: new Error('Show request failed. No more information provided.') };
     }
     const showInfo = await showInfoReq.res.json();
-    this.logObject(showInfo.data[0], 0);
+    await this.logObject(showInfo.data[0], 0);
 
     let episodeList = { total: 0, data: [], meta: {} } as CrunchyEpisodeList;
     //get episode info
@@ -1210,7 +1213,7 @@ export default class Crunchy implements ServiceClass {
       // Make sure we have a media id without a : in it
       const currentMediaId = (mMeta.mediaId.includes(':') ? mMeta.mediaId.split(':')[1] : mMeta.mediaId);
 
-      //Make sure token is up to date
+      //Make sure token is up-to-date
       await this.refreshToken(true, true);
       let currentVersion;
       let isPrimary = mMeta.isSubbed;
@@ -1218,7 +1221,10 @@ export default class Crunchy implements ServiceClass {
         headers: {
           Authorization: `Bearer ${this.token.access_token}`,
           'X-Cr-Disable-Drm': 'true',
-          'User-Agent': 'Crunchyroll/1.8.0 Nintendo Switch/12.3.12.0 UE4/4.27'
+          'X-Cr-Enable-Drm': 'false',
+          'X-Cr-Stream-Limits': 'false',
+          //'X-Cr-Segment-CDN': 'all',
+          //'User-Agent': 'Crunchyroll/1.8.0 Nintendo Switch/12.3.12.0 UE4/4.27'
         }
       };
 
@@ -1348,7 +1354,7 @@ export default class Crunchy implements ServiceClass {
         }
       }
 
-      let pbData = { total: 0, data: {}, meta: {} } as PlaybackData;
+      let pbData = { total: 0, data: [{}], meta: {} } as PlaybackData;
       if (this.api == 'android') {
         const videoStreamsReq = [
           api.beta_cms,
@@ -1390,7 +1396,7 @@ export default class Crunchy implements ServiceClass {
         const pbDataAndroid = await playbackReq.res.json() as CrunchyAndroidStreams;
         pbData = {
           total: 0,
-          data: [pbDataAndroid.streams],
+          data: [{}/*pbDataAndroid.streams*/],
           meta: {
             audio_locale: pbDataAndroid.audio_locale,
             bifs: pbDataAndroid.bifs,
@@ -1412,29 +1418,33 @@ export default class Crunchy implements ServiceClass {
           }
         }
         pbData = await playbackReq.res.json() as PlaybackData;
+        pbData.data = [{}];
       }
 
-      let switchStream: CrunchyPlayStream | null = null;
-      const playbackReq = await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/${currentVersion ? currentVersion.guid : currentMediaId}/console/switch/play`, AuthHeaders);
-      if(!playbackReq.ok || !playbackReq.res) {
-        console.error('Non-DRM Request Stream URLs FAILED!');
-      } else {
-        switchStream = await playbackReq.res.json() as CrunchyPlayStream;
-        const derivedPlaystreams = {} as CrunchyStreams;
-        for (const hardsub in switchStream.hardSubs) {
-          const stream = switchStream.hardSubs[hardsub];
-          derivedPlaystreams[hardsub] = {
-            url: stream.url,
-            'hardsub_locale': stream.hlang
+
+      let playStream: CrunchyPlayStream | null = null;
+      if (options.cstream !== 'none') {
+        const playbackReq = await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyPlayStreams[options.cstream]}/play`, AuthHeaders);
+        if (!playbackReq.ok || !playbackReq.res) {
+          console.error('Non-DRM Request Stream URLs FAILED!');
+        } else {
+          playStream = await playbackReq.res.json() as CrunchyPlayStream;
+          const derivedPlaystreams = {} as CrunchyStreams;
+          for (const hardsub in playStream.hardSubs) {
+            const stream = playStream.hardSubs[hardsub];
+            derivedPlaystreams[hardsub] = {
+              url: stream.url,
+              'hardsub_locale': stream.hlang
+            };
+          }
+          derivedPlaystreams[''] = {
+            url: playStream.url,
+            hardsub_locale: ''
+          };
+          pbData.data[0][`adaptive_${options.cstream}_${playStream.url.includes('m3u8') ? 'hls' : 'dash'}_drm`] = {
+            ...derivedPlaystreams
           };
         }
-        derivedPlaystreams[''] = {
-          url: switchStream.url,
-          hardsub_locale: ''
-        };
-        pbData.data[0]['adaptive_switch_dash'] = {
-          ...derivedPlaystreams
-        };
       }
 
       variables.push(...([
@@ -1513,7 +1523,7 @@ export default class Crunchy implements ServiceClass {
             if(s.hardsub_lang == '-'){
               return false;
             }
-            return s.hardsub_lang == options.hslang ? true : false;
+            return s.hardsub_lang == options.hslang;
           });
         }
         else{
@@ -1525,10 +1535,7 @@ export default class Crunchy implements ServiceClass {
         }
       } else {
         streams = streams.filter((s) => {
-          if(s.hardsub_lang != '-'){
-            return false;
-          }
-          return true;
+          return s.hardsub_lang == '-';
         });
         if(streams.length < 1){
           console.warn('Raw streams not available!');
@@ -1568,6 +1575,12 @@ export default class Crunchy implements ServiceClass {
         } else {
           const streamPlaylistBody = await streamPlaylistsReq.res.text();
           if (streamPlaylistBody.match('MPD')) {
+            //We have the stream, so go ahead and delete the active stream
+            if (playStream) {
+              await this.refreshToken(true, true);
+              await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+            }
+
             //Parse MPD Playlists
             const streamPlaylists = await parse(streamPlaylistBody, langsData.findLang(langsData.fixLanguageTag(pbData.meta.audio_locale as string) || ''), curStream.url.match(/.*\.urlset\//)[0]);
 
@@ -1889,7 +1902,7 @@ export default class Crunchy implements ServiceClass {
               // set plQualityStr
               const plBandwidth  = Math.round(pl.attributes.BANDWIDTH/1024);
               const qualityStrAdd   = `${plResolutionText} (${plBandwidth}KiB/s)`;
-              const qualityStrRegx  = new RegExp(qualityStrAdd.replace(/(:|\(|\)|\/)/g, '\\$1'), 'm');
+              const qualityStrRegx  = new RegExp(qualityStrAdd.replace(/([:()/])/g, '\\$1'), 'm');
               const qualityStrMatch = !plQuality.map(a => a.str).join('\r\n').match(qualityStrRegx);
               if(qualityStrMatch){
                 plQuality.push({
@@ -1952,6 +1965,12 @@ export default class Crunchy implements ServiceClass {
                 console.error('CAN\'T FETCH VIDEO PLAYLIST!');
                 dlFailed = true;
               } else {
+                // We have the stream, so go ahead and delete the active stream
+                if (playStream) {
+                  await this.refreshToken(true, true);
+                  await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+                }
+
                 const chunkPageBody = await chunkPage.res.text();
                 const chunkPlaylist = m3u8(chunkPageBody);
                 const totalParts = chunkPlaylist.segments.length;
@@ -2131,11 +2150,6 @@ export default class Crunchy implements ServiceClass {
         console.info('Subtitles downloading skipped!');
       }
 
-      if (switchStream) {
-        await this.refreshToken(true, true);
-        await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${switchStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
-      }
-
       await this.sleep(options.waittime);
     }
     return {
@@ -2155,8 +2169,6 @@ export default class Crunchy implements ServiceClass {
     }
     const merger = new Merger({
       onlyVid: hasAudioStreams ? data.filter(a => a.type === 'Video').map((a) : MergerInput => {
-        if (a.type === 'Subtitle')
-          throw new Error('Never');
         return {
           lang: a.lang,
           path: a.path,
@@ -2164,8 +2176,6 @@ export default class Crunchy implements ServiceClass {
       }) : [],
       skipSubMux: options.skipSubMux,
       onlyAudio: hasAudioStreams ? data.filter(a => a.type === 'Audio').map((a) : MergerInput => {
-        if (a.type === 'Subtitle')
-          throw new Error('Never');
         return {
           lang: a.lang,
           path: a.path,
@@ -2173,12 +2183,6 @@ export default class Crunchy implements ServiceClass {
       }) : [],
       output: `${options.output}.${options.mp4 ? 'mp4' : 'mkv'}`,
       subtitles: data.filter(a => a.type === 'Subtitle').map((a) : SubtitleInput => {
-        if (a.type === 'Video')
-          throw new Error('Never');
-        if (a.type === 'Audio')
-          throw new Error('Never');
-        if (a.type === 'Chapters')
-          throw new Error('Never');
         return {
           file: a.path,
           language: a.language,
@@ -2190,20 +2194,12 @@ export default class Crunchy implements ServiceClass {
       keepAllVideos: options.keepAllVideos,
       fonts: Merger.makeFontsList(this.cfg.dir.fonts, data.filter(a => a.type === 'Subtitle') as sxItem[]),
       videoAndAudio: hasAudioStreams ? [] : data.filter(a => a.type === 'Video').map((a) : MergerInput => {
-        if (a.type === 'Subtitle')
-          throw new Error('Never');
         return {
           lang: a.lang,
           path: a.path,
         };
       }),
       chapters: data.filter(a => a.type === 'Chapters').map((a) : MergerInput => {
-        if (a.type === 'Video')
-          throw new Error('Never');
-        if (a.type === 'Audio')
-          throw new Error('Never');
-        if (a.type === 'Subtitle')
-          throw new Error('Never');
         return {
           path: a.path,
           lang: a.lang
@@ -2526,7 +2522,7 @@ export default class Crunchy implements ServiceClass {
     }
     const showInfo = await showInfoReq.res.json();
     if (log)
-      this.logObject(showInfo, 0);
+      await this.logObject(showInfo, 0);
 
     let episodeList = { total: 0, data: [], meta: {} } as CrunchyEpisodeList;
     //get episode info

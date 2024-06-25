@@ -127,7 +127,7 @@ export default class Hidive implements ServiceClass {
       useProxy: true
     };
     // get request type
-    const isGet = method == 'GET' ? true : false;
+    const isGet = method == 'GET';
     if(!isGet){
       options.body = body == '' ? body : JSON.stringify(body);
       options.headers['Content-Type'] = 'application/json';
@@ -243,11 +243,7 @@ export default class Hidive implements ServiceClass {
       }, 'auth');
       if(!authReq.ok || !authReq.res){
         console.error('Token refresh failed, reinitializing session...');
-        if (!this.initSession()) {
-          return false;
-        } else {
-          return true;
-        }
+        return this.initSession();
       }
       const tokens: Record<string, string> = JSON.parse(authReq.res.body);
       for (const token in tokens) {
@@ -435,7 +431,7 @@ export default class Hidive implements ServiceClass {
     for (let i = 0; i < showData.length; i++) {
       const titleId = showData[i].id;
       const seriesTitle = getShowData.series.title;
-      const seasonTitle = getShowData.series.seasons[showData[i].episodeInformation.seasonNumber-1]?.title;
+      const seasonTitle = getShowData.series.seasons[showData[i].episodeInformation.seasonNumber-1]?.title ?? seriesTitle;
       let nameLong = showData[i].title;
       if (nameLong.match(/OVA/i)) {
         nameLong = 'ova' + (('0' + ovaSeq).slice(-2)); ovaSeq++;
