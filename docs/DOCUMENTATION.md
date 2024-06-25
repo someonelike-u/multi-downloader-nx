@@ -61,6 +61,12 @@ Use this command to download all the fonts and add them to the muxed **mkv** fil
 | Hidive, AnimationDigitalNetwork | `--fontName ${fontName}` | `string` | `No`| `NaN` | `NaN` |
 
 Set the font to use in subtiles
+#### `--customStyles`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| AnimationDigitalNetwork | `--customStyles ${customStyles}` | `string` | `No`| `NaN` | ``| `customStyles: ` |
+
+Use custom styles in your ADN subtitles
 ### Search
 #### `--search`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
