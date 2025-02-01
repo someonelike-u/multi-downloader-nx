@@ -677,12 +677,10 @@ export default class AnimationDigitalNetwork implements ServiceClass {
               const mathMsg    = `(${mathParts}*${options.partsize})`;
               console.info('Total parts in stream:', totalParts, mathMsg);
               tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
-              const split = outFile.split(path.sep).slice(0, -1);
-              split.forEach((val, ind, arr) => {
-                const isAbsolut = path.isAbsolute(outFile as string);
-                if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-                  fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-              });
+              const dirName = path.dirname(tsFile);
+              if (!fs.existsSync(dirName)) {
+                fs.mkdirSync(dirName, { recursive: true });
+              }
               const dlStreamByPl = await new streamdl({
                 output: `${tsFile}.ts`,
                 timeout: options.timeout,
@@ -764,12 +762,10 @@ export default class AnimationDigitalNetwork implements ServiceClass {
           fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
           const outFile = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
           const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
-          const split = outFile.split(path.sep).slice(0, -1);
-          split.forEach((val, ind, arr) => {
-            const isAbsolut = path.isAbsolute(outFile as string);
-            if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-              fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-          });
+          const dirName = path.dirname(tsFile);
+          if (!fs.existsSync(dirName)) {
+            fs.mkdirSync(dirName, { recursive: true });
+          }
           fs.writeFileSync(`${tsFile}.txt`, compiledChapters.join('\r\n'));
           files.push({
             path: `${tsFile}.txt`,
@@ -833,13 +829,15 @@ export default class AnimationDigitalNetwork implements ServiceClass {
         
           const sxData: Partial<sxItem> = {};
           sxData.file = langsData.subsFile(fileName as string, subIndex+'', subLang, false, options.ccTag);
-          sxData.path = path.join(this.cfg.dir.content, sxData.file);
-          const split = sxData.path.split(path.sep).slice(0, -1);
-          split.forEach((val, ind, arr) => {
-            const isAbsolut = path.isAbsolute(sxData.path as string);
-            if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-              fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-          });
+          if (path.isAbsolute(sxData.file)) {
+            sxData.path = sxData.file;
+          } else {
+            sxData.path = path.join(this.cfg.dir.content, sxData.file);
+          }
+          const dirName = path.dirname(sxData.path);
+          if (!fs.existsSync(dirName)) {
+            fs.mkdirSync(dirName, { recursive: true });
+          }
           sxData.language = subLang;
           if(options.dlsubs.includes('all') || options.dlsubs.includes(subLang.locale)) {
 

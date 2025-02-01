@@ -35,7 +35,7 @@ import { Episode, NewHidiveEpisodeExtra, NewHidiveSeason, NewHidiveSeriesExtra }
 import { NewHidiveEpisode } from './@types/newHidiveEpisode';
 import { NewHidivePlayback, Subtitle } from './@types/newHidivePlayback';
 import { MPDParsed, parse } from './modules/module.transform-mpd';
-import getKeys, { canDecrypt } from './modules/widevine';
+import { canDecrypt, getKeysWVD, cdm, getKeysPRD } from './modules/cdm';
 import { exec } from './modules/sei-helper-fixes';
 import { KeyContainer } from './modules/license';
 
@@ -656,7 +656,15 @@ export default class Hidive implements ServiceClass {
     const subsMargin = 0;
     const chosenFontSize = options.originalFontSize ? undefined : options.fontSize;
     let encryptionKeys: KeyContainer[] = [];
-    if (!canDecrypt) console.warn('Decryption not enabled!');
+    if (!canDecrypt) {
+      console.error('No valid Widevine or PlayReady CDM detected. Please ensure a supported and functional CDM is installed.');
+      return undefined;
+    }
+    
+    if (!this.cfg.bin.mp4decrypt && !this.cfg.bin.shaka) {
+      console.error('Neither Shaka nor MP4Decrypt found. Please ensure at least one of them is installed.');
+      return undefined;
+    }
 
     if (!this.cfg.bin.ffmpeg) 
       this.cfg.bin = await yamlCfg.loadBinCfg();
@@ -763,10 +771,17 @@ export default class Hidive implements ServiceClass {
     console.info(`Selected (Available) Audio Languages: ${chosenAudios.map(a => a.language.name).join(', ')}`);
     console.info('Stream URL:', chosenVideoSegments.segments[0].map.uri.split('/init.mp4')[0]);
 
-    if (chosenAudios[0].pssh || chosenVideoSegments.pssh) {
-      encryptionKeys = await getKeys(chosenVideoSegments.pssh, 'https://shield-drm.imggaming.com/api/v2/license', {
+    if (chosenAudios[0].pssh_wvd && cdm === 'widevine' || chosenVideoSegments.pssh_wvd && cdm === 'widevine') {
+      encryptionKeys = await getKeysWVD(chosenVideoSegments.pssh_wvd, 'https://shield-drm.imggaming.com/api/v2/license', {
         'Authorization': `Bearer ${selectedEpisode.jwtToken}`,
         'X-Drm-Info': 'eyJzeXN0ZW0iOiJjb20ud2lkZXZpbmUuYWxwaGEifQ==',
+      });
+    }
+
+    if (chosenAudios[0].pssh_prd && cdm === 'playready' || chosenVideoSegments.pssh_prd && cdm === 'playready') {
+      encryptionKeys = await getKeysPRD(chosenVideoSegments.pssh_prd, 'https://shield-drm.imggaming.com/api/v2/license', {
+        'Authorization': `Bearer ${selectedEpisode.jwtToken}`,
+        'X-Drm-Info': 'eyJzeXN0ZW0iOiJjb20ubWljcm9zb2Z0LnBsYXlyZWFkeSJ9',
       });
     }
           
@@ -779,12 +794,10 @@ export default class Hidive implements ServiceClass {
       const tsFile = path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName);
       const tempFile = parseFileName(`temp-${selectedEpisode.id}`, variables, options.numbers, options.override).join(path.sep);
       const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
-      const split = fileName.split(path.sep).slice(0, -1);
-      split.forEach((val, ind, arr) => {
-        const isAbsolut = path.isAbsolute(fileName);
-        if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-          fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-      });
+      const dirName = path.dirname(tsFile);
+      if (!fs.existsSync(dirName)) {
+        fs.mkdirSync(dirName, { recursive: true });
+      }
       const videoJson: M3U8Json = {
         segments: chosenVideoSegments.segments
       };
@@ -810,18 +823,23 @@ export default class Hidive implements ServiceClass {
         console.error(`DL Stats: ${JSON.stringify(videoDownload.parts)}\n`);
         dlFailed = true;
       } else {
-        if (chosenVideoSegments.pssh) {
+        if (chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd) {
           console.info('Decryption Needed, attempting to decrypt');
           if (encryptionKeys.length == 0) {
             console.error('Failed to get encryption keys');
             return undefined;
           }
-          if (this.cfg.bin.mp4decrypt) {
-            const commandBase = `--show-progress --key ${encryptionKeys[1].kid}:${encryptionKeys[1].key} `;
-            const commandVideo = commandBase+`"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
+          if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
+            let commandBase = `--show-progress --key ${encryptionKeys[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeys[cdm === 'playready' ? 0 : 1].key} `;
+            let commandVideo = commandBase+`"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
 
-            console.info('Started decrypting video');
-            const decryptVideo = exec('mp4decrypt', `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
+            if (this.cfg.bin.shaka) {
+              commandBase = ` --enable_raw_key_decryption ${encryptionKeys.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
+              commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"`+commandBase;
+            }
+
+            console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
+            const decryptVideo = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
             if (!decryptVideo.isOk) {
               console.error(decryptVideo.err);
               console.error(`Decryption failed with exit code ${decryptVideo.err.code}`);
@@ -832,7 +850,8 @@ export default class Hidive implements ServiceClass {
               if (!options.nocleanup) {
                 fs.removeSync(`${tempTsFile}.video.enc.m4s`);
               }
-              fs.renameSync(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
+              fs.copyFileSync(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
+              fs.unlinkSync(`${tempTsFile}.video.m4s`);
               files.push({
                 type: 'Video',
                 path: `${tsFile}.video.m4s`,
@@ -841,7 +860,7 @@ export default class Hidive implements ServiceClass {
               });
             }
           } else {
-            console.warn('mp4decrypt not found, files need decryption. Decryption Keys:', encryptionKeys);
+            console.warn('mp4decrypt/shaka not found, files need decryption. Decryption Keys:', encryptionKeys);
           }
         }
       }
@@ -861,12 +880,10 @@ export default class Hidive implements ServiceClass {
         const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
         const outFile = parseFileName(options.fileName + '.' + (chosenAudioSegments.language.name), variables, options.numbers, options.override).join(path.sep);
         const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
-        const split = outFile.split(path.sep).slice(0, -1);
-        split.forEach((val, ind, arr) => {
-          const isAbsolut = path.isAbsolute(outFile as string);
-          if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-            fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-        });
+        const dirName = path.dirname(tsFile);
+        if (!fs.existsSync(dirName)) {
+          fs.mkdirSync(dirName, { recursive: true });
+        }
         const audioJson: M3U8Json = {
           segments: chosenAudioSegments.segments
         };
@@ -892,18 +909,23 @@ export default class Hidive implements ServiceClass {
           console.error(`DL Stats: ${JSON.stringify(audioDownload.parts)}\n`);
           dlFailed = true;
         }
-        if (chosenAudioSegments.pssh) {
+        if (chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd) {
           console.info('Decryption Needed, attempting to decrypt');
           if (encryptionKeys.length == 0) {
             console.error('Failed to get encryption keys');
             return undefined;
           }
-          if (this.cfg.bin.mp4decrypt) {
-            const commandBase = `--show-progress --key ${encryptionKeys[1].kid}:${encryptionKeys[1].key} `;
-            const commandAudio = commandBase+`"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
+          if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
+            let commandBase = `--show-progress --key ${encryptionKeys[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeys[cdm === 'playready' ? 0 : 1].key} `;
+            let commandAudio = commandBase+`"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
+
+            if (this.cfg.bin.shaka) {
+              commandBase = ` --enable_raw_key_decryption ${encryptionKeys.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
+              commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"`+commandBase;
+            }
 
             console.info('Started decrypting audio');
-            const decryptAudio = exec('mp4decrypt', `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
+            const decryptAudio = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
             if (!decryptAudio.isOk) {
               console.error(decryptAudio.err);
               console.error(`Decryption failed with exit code ${decryptAudio.err.code}`);
@@ -913,7 +935,8 @@ export default class Hidive implements ServiceClass {
               if (!options.nocleanup) {
                 fs.removeSync(`${tempTsFile}.audio.enc.m4s`);
               }
-              fs.renameSync(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
+              fs.copyFileSync(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
+              fs.unlinkSync(`${tempTsFile}.audio.m4s`);
               files.push({
                 type: 'Audio',
                 path: `${tsFile}.audio.m4s`,
@@ -951,7 +974,15 @@ export default class Hidive implements ServiceClass {
           }
           const sxData: Partial<sxItem> = {};
           sxData.file = langsData.subsFile(fileName as string, subIndex+'', subLang, false, options.ccTag);
-          sxData.path = path.join(this.cfg.dir.content, sxData.file);
+          if (path.isAbsolute(sxData.file)) {
+            sxData.path = sxData.file;
+          } else {
+            sxData.path = path.join(this.cfg.dir.content, sxData.file);
+          }
+          const dirName = path.dirname(sxData.path);
+          if (!fs.existsSync(dirName)) {
+            fs.mkdirSync(dirName, { recursive: true });
+          }
           sxData.language = subLang;
           if(options.dlsubs.includes('all') || options.dlsubs.includes(subLang.locale)) {
             const getVttContent = await this.req.getData(sub.url);

@@ -15,7 +15,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import * as reqModule from './modules/module.fetch';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
-import getKeys, { canDecrypt } from './modules/widevine';
+import { canDecrypt, getKeysWVD, cdm, getKeysPRD } from './modules/cdm';
 import streamdl, { M3U8Json } from './modules/hls-download';
 import { exec } from './modules/sei-helper-fixes';
 import { console } from './modules/log';
@@ -476,7 +476,13 @@ export default class AnimeOnegai implements ServiceClass {
       }));
 
       if (!canDecrypt) {
-        console.warn('Decryption not enabled!');
+        console.error('No valid Widevine or PlayReady CDM detected. Please ensure a supported and functional CDM is installed.');
+        return undefined;
+      }
+      
+      if (!this.cfg.bin.mp4decrypt && !this.cfg.bin.shaka) {
+        console.error('Neither Shaka nor MP4Decrypt found. Please ensure at least one of them is installed.');
+        return undefined;
       }
 
       const lang = langsData.languages.find(a=>a.ao_locale == media.lang) as langsData.LanguageItem;
@@ -586,18 +592,16 @@ export default class AnimeOnegai implements ServiceClass {
             const mathMsg    = `(${mathParts}*${options.partsize})`;
             console.info('Total parts in video stream:', totalParts, mathMsg);
             tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
-            const split = outFile.split(path.sep).slice(0, -1);
-            split.forEach((val, ind, arr) => {
-              const isAbsolut = path.isAbsolute(outFile as string);
-              if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-                fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-            });
+            const dirName = path.dirname(tsFile);
+            if (!fs.existsSync(dirName)) {
+              fs.mkdirSync(dirName, { recursive: true });
+            }
             const videoJson: M3U8Json = {
               segments: chosenVideoSegments.segments
             };
             try {
               const videoDownload = await new streamdl({
-                output: chosenVideoSegments.pssh ? `${tempTsFile}.video.enc.mp4` : `${tsFile}.video.mp4`,
+                output: chosenVideoSegments.pssh_wvd ? `${tempTsFile}.video.enc.mp4` : `${tsFile}.video.mp4`,
                 timeout: options.timeout,
                 m3u8json: videoJson,
                 // baseurl: chunkPlaylist.baseUrl,
@@ -634,18 +638,16 @@ export default class AnimeOnegai implements ServiceClass {
             const mathMsg    = `(${mathParts}*${options.partsize})`;
             console.info('Total parts in audio stream:', totalParts, mathMsg);
             tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
-            const split = outFile.split(path.sep).slice(0, -1);
-            split.forEach((val, ind, arr) => {
-              const isAbsolut = path.isAbsolute(outFile as string);
-              if (!fs.existsSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val)))
-                fs.mkdirSync(path.join(isAbsolut ? '' : this.cfg.dir.content, ...arr.slice(0, ind), val));
-            });
+            const dirName = path.dirname(tsFile);
+            if (!fs.existsSync(dirName)) {
+              fs.mkdirSync(dirName, { recursive: true });
+            }
             const audioJson: M3U8Json = {
               segments: chosenAudioSegments.segments
             };
             try {
               const audioDownload = await new streamdl({
-                output: chosenAudioSegments.pssh ? `${tempTsFile}.audio.enc.mp4` : `${tsFile}.audio.mp4`,
+                output: chosenAudioSegments.pssh_wvd ? `${tempTsFile}.audio.enc.mp4` : `${tsFile}.audio.mp4`,
                 timeout: options.timeout,
                 m3u8json: audioJson,
                 // baseurl: chunkPlaylist.baseUrl,
@@ -677,10 +679,18 @@ export default class AnimeOnegai implements ServiceClass {
           }
 
           //Handle Decryption if needed
-          if ((chosenVideoSegments.pssh || chosenAudioSegments.pssh) && (videoDownloaded || audioDownloaded)) {
+          if ((chosenVideoSegments.pssh_wvd || chosenAudioSegments.pssh_wvd) && (videoDownloaded || audioDownloaded)) {
             console.info('Decryption Needed, attempting to decrypt');
-            const encryptionKeys = await getKeys(chosenVideoSegments.pssh, streamData.widevine_proxy, {});
-            if (encryptionKeys.length == 0) {
+            let encryptionKeys;
+
+            if (cdm === 'widevine') {
+              encryptionKeys = await getKeysWVD(chosenVideoSegments.pssh_wvd, streamData.widevine_proxy, {});
+            }
+            if (cdm === 'playready') {
+              encryptionKeys = await getKeysPRD(chosenVideoSegments.pssh_prd, streamData.playready_proxy, {});
+            }
+
+            if (!encryptionKeys || encryptionKeys.length == 0) {
               console.error('Failed to get encryption keys');
               return undefined;
             }
@@ -689,14 +699,20 @@ export default class AnimeOnegai implements ServiceClass {
                 keys[key.kid] = key.key;
               });*/
 
-            if (this.cfg.bin.mp4decrypt) {
-              const commandBase = `--show-progress --key ${encryptionKeys[1].kid}:${encryptionKeys[1].key} `;
-              const commandVideo = commandBase+`"${tempTsFile}.video.enc.mp4" "${tempTsFile}.video.mp4"`;
-              const commandAudio = commandBase+`"${tempTsFile}.audio.enc.mp4" "${tempTsFile}.audio.mp4"`;
+            if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
+              let commandBase = `--show-progress --key ${encryptionKeys[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeys[cdm === 'playready' ? 0 : 1].key} `;
+              let commandVideo = commandBase+`"${tempTsFile}.video.enc.mp4" "${tempTsFile}.video.mp4"`;
+              let commandAudio = commandBase+`"${tempTsFile}.audio.enc.mp4" "${tempTsFile}.audio.mp4"`;
+
+              if (this.cfg.bin.shaka) {
+                commandBase = ` --enable_raw_key_decryption ${encryptionKeys.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
+                commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"`+commandBase;
+                commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"`+commandBase;
+              }
 
               if (videoDownloaded) {
-                console.info('Started decrypting video');
-                const decryptVideo = exec('mp4decrypt', `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
+                console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
+                const decryptVideo = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
                 if (!decryptVideo.isOk) {
                   console.error(decryptVideo.err);
                   console.error(`Decryption failed with exit code ${decryptVideo.err.code}`);
@@ -707,7 +723,8 @@ export default class AnimeOnegai implements ServiceClass {
                   if (!options.nocleanup) {
                     fs.removeSync(`${tempTsFile}.video.enc.mp4`);
                   }
-                  fs.renameSync(`${tempTsFile}.video.mp4`, `${tsFile}.video.mp4`);
+                  fs.copyFileSync(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
+                  fs.unlinkSync(`${tempTsFile}.video.m4s`);
                   files.push({
                     type: 'Video',
                     path: `${tsFile}.video.mp4`,
@@ -717,8 +734,8 @@ export default class AnimeOnegai implements ServiceClass {
               }
 
               if (audioDownloaded) {
-                console.info('Started decrypting audio');
-                const decryptAudio = exec('mp4decrypt', `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
+                console.info('Started decrypting audio,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
+                const decryptAudio = exec(this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
                 if (!decryptAudio.isOk) {
                   console.error(decryptAudio.err);
                   console.error(`Decryption failed with exit code ${decryptAudio.err.code}`);
@@ -728,7 +745,8 @@ export default class AnimeOnegai implements ServiceClass {
                   if (!options.nocleanup) {
                     fs.removeSync(`${tempTsFile}.audio.enc.mp4`);
                   }
-                  fs.renameSync(`${tempTsFile}.audio.mp4`, `${tsFile}.audio.mp4`);
+                  fs.copyFileSync(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
+                  fs.unlinkSync(`${tempTsFile}.audio.m4s`);
                   files.push({
                     type: 'Audio',
                     path: `${tsFile}.audio.mp4`,
@@ -738,7 +756,7 @@ export default class AnimeOnegai implements ServiceClass {
                 }
               }
             } else {
-              console.warn('mp4decrypt not found, files need decryption. Decryption Keys:', encryptionKeys);
+              console.warn('mp4decrypt/shaka not found, files need decryption. Decryption Keys:', encryptionKeys);
             }
           } else {
             if (videoDownloaded) {
@@ -780,7 +798,15 @@ export default class AnimeOnegai implements ServiceClass {
             }
             const sxData: Partial<sxItem> = {};
             sxData.file = langsData.subsFile(fileName as string, subIndex+'', subLang, false, options.ccTag);
-            sxData.path = path.join(this.cfg.dir.content, sxData.file);
+            if (path.isAbsolute(sxData.file)) {
+              sxData.path = sxData.file;
+            } else {
+              sxData.path = path.join(this.cfg.dir.content, sxData.file);
+            }
+            const dirName = path.dirname(sxData.path);
+            if (!fs.existsSync(dirName)) {
+              fs.mkdirSync(dirName, { recursive: true });
+            }
             sxData.language = subLang;
             if((options.dlsubs.includes('all') || options.dlsubs.includes(subLang.locale)) && sub.url.includes('.ass')) {
               const getSubtitle = await this.req.getData(sub.url, AuthHeaders);

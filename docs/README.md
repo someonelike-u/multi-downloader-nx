@@ -66,7 +66,8 @@ By default this application uses the following paths to programs (main executabl
 * `ffmpeg.exe` (From PATH)
 * `ffprobe.exe` (From PATH)
 * `mkvmerge.exe` (From PATH)
-* `mp4decrypt.exe` (From PATH)
+* `mp4decrypt.exe` (From PATH) (or shaka-packager)
+* `shaka-packager.exe` (From PATH) (or mp4decrypt)
 
 To change these paths you need to edit `bin-path.yml` in `./config/` directory.
 
@@ -146,8 +147,15 @@ If you want to package the application, run pnpm run build-`{platform}`-`{type}`
 
 ### Decryption Requirements
 
-* mp4decrypt >= Any (http://www.bento4.com/) - Only required for decrypting
+* mp4decrypt >= Any (http://www.bento4.com/) - Only required for decrypting (or shaka-packager)
+* shaka-packager >= Any (https://github.com/shaka-project/shaka-packager/releases) - Only required for decrypting (or mp4decrypt)
 
-### Instructions
+### Instructions (Widevine)
 
 In order to decrypt DRM content, you will need to have a dumped CDM, after that you will need to place the CDM files (`device_client_id_blob` and `device_private_key`) into the `./widevine/` directory. For legal reasons we do not include the CDM with the software, and you will have to source one yourself.
+
+### Instructions (Playready)
+
+Playready CDMs are very easy to obtain, you can find them even on Github.
+Place the CDM in the `./playready/` directory and you're all set!
+**IMPORTANT**: The Playready CDM (SL2000/SL3000) needs to be provisioned as a **V3 Device** by pyplayready (https://github.com/ready-dl/pyplayready).
