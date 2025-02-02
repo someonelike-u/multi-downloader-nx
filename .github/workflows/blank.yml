@@ -34,7 +34,7 @@ jobs:
             echo "changes_pushed=true" >> $GITHUB_OUTPUT
           else
             echo "No new changes."
-            echo "changes_pushed=false" >> $GITHUB_OUTPUT
+            echo "changes_pushed=true" >> $GITHUB_OUTPUT
           fi
   create_release:
     needs: sync
