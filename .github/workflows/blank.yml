@@ -24,7 +24,7 @@ jobs:
         id: get_version
         run: |
           LATEST_COMMIT=$(git rev-list --tags --max-count=1)
-          LATEST_TAG=$(git describe --tags "$LATEST_COMMIT" 2>/dev/null || echo "v0.0.0")
+          LATEST_TAG=$(git describe --tags "$LATEST_COMMIT")
           echo "Latest tag: $LATEST_TAG"
       - name: Generate Forked Version
         id: fork_version
