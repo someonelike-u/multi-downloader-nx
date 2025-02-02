@@ -1,4 +1,4 @@
-name: Sync Fork
+name: Sync Fork and auto-release
 
 on:
   schedule:
@@ -7,9 +7,7 @@ on:
 
 jobs:
   sync:
-
     runs-on: ubuntu-latest
-
     steps:
       - uses: tgymnich/fork-sync@v2.0
         with:
@@ -17,3 +15,29 @@ jobs:
           owner: someonelike-u
           base: master
           head: master
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get Latest Version from Upstream
+        id: get_version
+        run: |
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+      - name: Generate Forked Version
+        id: fork_version
+        run: |
+          ORIGINAL_VERSION=${{ env.LATEST_TAG }}
+          FORKED_VERSION="${ORIGINAL_VERSION}.1"
+          echo "FORKED_VERSION=$FORKED_VERSION" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.FORKED_VERSION }}
+          name: "Release ${{ env.FORKED_VERSION }}"
+          body: "Automated release based on upstream version ${{ env.LATEST_TAG }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
