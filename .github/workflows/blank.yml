@@ -8,6 +8,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      changes_pushed: ${{ steps.check_diff.outputs.changes_pushed }}
     steps:
       - uses: tgymnich/fork-sync@v2.0
         with:
@@ -15,8 +17,28 @@ jobs:
           owner: someonelike-u
           base: master
           head: master
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check if there are new commits
+        id: check_diff
+        run: |
+          git fetch origin master
+          LOCAL_HASH=$(git rev-parse HEAD)
+          REMOTE_HASH=$(git rev-parse origin/master)
+
+          echo "Local hash: $LOCAL_HASH"
+          echo "Remote hash: $REMOTE_HASH"
+
+          if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+            echo "New changes detected!"
+            echo "changes_pushed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No new changes."
+            echo "changes_pushed=false" >> $GITHUB_OUTPUT
+          fi
   create_release:
     needs: sync
+    if: needs.sync.outputs.changes_pushed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -69,6 +91,7 @@ jobs:
 
   build:
     needs: create_release
+    if: needs.sync.outputs.changes_pushed == 'true'
     strategy:
       matrix:
         build_type: [ linux, macos, windows ]
