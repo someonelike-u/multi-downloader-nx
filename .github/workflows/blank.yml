@@ -23,15 +23,10 @@ jobs:
       - name: Get Latest Version from Upstream
         id: get_version
         run: |
-          git fetch upstream --tags --force
-          LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
-
-          if [[ -z "$LATEST_TAG" ]]; then
-            LATEST_TAG="v0.0.0"
-          fi
-
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-          echo "Latest upstream tag: $LATEST_TAG"
+          LATEST_COMMIT=$(git rev-list --tags --max-count=1)
+          echo "Commit du dernier tag : $LATEST_COMMIT"
+          LATEST_TAG=$(git describe --tags "$LATEST_COMMIT")
+          echo "Latest tag: $LATEST_TAG"
       - name: Generate Forked Version
         id: fork_version
         run: |
