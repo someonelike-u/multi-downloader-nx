@@ -1,0 +1,113 @@
+name: Create release manually
+
+on:
+  workflow_dispatch: # on button click
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get Latest Version from Upstream
+        id: get_version
+        run: |
+          git remote add upstream https://github.com/anidl/multi-downloader-nx || true
+          git fetch upstream --tags --force
+          
+          LATEST_COMMIT=$(git rev-list --tags --max-count=1)
+          
+          if [[ -z "$LATEST_COMMIT" ]]; then
+            LATEST_TAG="v0.0.0"
+          else
+            LATEST_TAG=$(git describe --tags "$LATEST_COMMIT")
+          fi
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "Dernier tag depuis upstream : $LATEST_TAG"
+      - name: Generate Forked Version
+        id: fork_version
+        run: |
+          ORIGINAL_VERSION=${{ env.LATEST_TAG }}
+          FORKED_VERSION="${ORIGINAL_VERSION}.1"
+          echo "FORKED_VERSION=$FORKED_VERSION" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.FORKED_VERSION }}
+          name: "${{ env.FORKED_VERSION }}"
+          body: "Automated release based on main version ${{ env.LATEST_TAG }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get release upload URL using GitHub API
+        id: get_upload_url
+        run: |
+          release_info=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.FORKED_VERSION }}")
+          echo "Release info: $release_info"
+          upload_url=$(echo "$release_info" | jq -r '.upload_url')
+          echo "Upload URL: $upload_url"
+          echo "$upload_url" > upload_url.txt
+      - name: Upload Upload URL as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-url
+          path: upload_url.txt
+
+  build:
+    needs: create_release
+    strategy:
+      matrix:
+        build_type: [ linux, macos, windows ]
+        build_arch: [ x64 ]
+        gui: [ gui, cli ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8.6.6
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          check-latest: true
+
+      - name: Install Node modules
+        run: |
+          pnpm install
+
+      - name: Get name and version from package.json
+        run: |
+          test -n $(node -p -e "require('./package.json').name") &&
+          test -n $(node -p -e "require('./package.json').version") &&
+          echo PACKAGE_NAME=$(node -p -e "require('./package.json').name") >> $GITHUB_ENV &&
+          echo PACKAGE_VERSION=$(node -p -e "require('./package.json').version") >> $GITHUB_ENV || exit 1
+
+      - name: Make build
+        run: pnpm run build-${{ matrix.build_type }}-${{ matrix.gui }}
+
+      - name: Download Upload URL artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: upload-url
+
+      - name: Read Upload URL from artifact
+        run: |
+          UPLOAD_URL=$(cat upload_url.txt)
+          echo "Upload URL: $UPLOAD_URL"
+          echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_name: multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.gui }}.7z
+          asset_path: ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
+          asset_content_type: application/x-7z-compressed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
