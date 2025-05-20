@@ -11,7 +11,7 @@ jobs:
     outputs:
       changes_pushed: ${{ steps.check_diff.outputs.changes_pushed }}
     steps:
-      - uses: tgymnich/fork-sync@v2.0.10
+      - uses: CloudNStoyan/fork-sync@v2.0.10
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: someonelike-u
