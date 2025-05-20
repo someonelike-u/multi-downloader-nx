@@ -36,6 +36,7 @@ export type APIType = {
   /**
    * Header
    */
+  crunchyDefHeader: Record<string, string>,
   crunchyAuthHeader: Record<string, string>,
   hd_apikey: string,
   hd_devName: string,
@@ -59,13 +60,13 @@ const api: APIType = {
   rss_gid:           `${domain.www}/syndication/feed?type=episodes&group_id=`, // &lang=enUS
   media_page:        `${domain.www}/media-`,
   series_page:       `${domain.www}/series-`,
-  auth:              `${domain.api_beta}/auth/v1/token`,
+  auth:              `${domain.www}/auth/v1/token`,
   // mobile api
   search3:           `${domain.api}/autocomplete.0.json`,
   session:           `${domain.api}/start_session.0.json`,
   collections:       `${domain.api}/list_collections.0.json`,
   // This User-Agent bypasses Cloudflare security of the newer Endpoint
-  defaultUserAgent:  'Crunchyroll/4.75.0 (bundle_identifier:com.crunchyroll.iphone; build_number:4100608.433889621) iOS/18.3.2 Gravity/4.75.0',
+  defaultUserAgent:  'Crunchyroll/4.77.3 (bundle_identifier:com.crunchyroll.iphone; build_number:4148147.285670380) iOS/18.3.2 Gravity/4.77.3',
   beta_profile:      `${domain.api_beta}/accounts/v1/me/profile`,
   beta_cmsToken:     `${domain.api_beta}/index/v2`,
   search:            `${domain.api_beta}/content/v2/discover/search`,
@@ -73,11 +74,13 @@ const api: APIType = {
   beta_browse:       `${domain.api_beta}/content/v1/browse`,
   beta_cms:          `${domain.api_beta}/cms/v2`,
   // beta api
+  // broken - deprecated since 06.05.2025
   drm:               `${domain.api_beta}/drm/v1/auth`,
   // new drm endpoints
   drm_widevine:      `${domain.www}/license/v1/license/widevine`,
   // playready endpoint currently broken
   drm_playready:     `${domain.www}/license/v1/license/playReady`,
+  crunchyDefHeader: {},
   crunchyAuthHeader: {},
   //hidive API
   hd_apikey:        '508efd7b42d546e19cc24f4d0b414e57e351ca73',
@@ -92,10 +95,19 @@ const api: APIType = {
   hd_new_version:    '6.0.1.bbf09a2'
 };
 
+api.crunchyDefHeader = {
+  'User-Agent': api.defaultUserAgent,
+  'Accept': '*/*',
+  'Accept-Encoding': 'gzip;q=1.0, compress;q=0.5',
+  'Accept-Language': 'de-IT;q=1.0, it-IT;q=0.9, en-GB;q=0.8',
+  'Connection': 'keep-alive',
+  'Host': 'www.crunchyroll.com'
+};
+
 // set header
 api.crunchyAuthHeader = {
-  'User-Agent': api.defaultUserAgent,
-  'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+  'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+  ...api.crunchyDefHeader
 };
 
 export {

@@ -2,7 +2,6 @@
 
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import react from 'eslint-plugin-react';
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -15,6 +14,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-declaration-merging': 'warn',
       '@typescript-eslint/no-unused-vars' : 'warn',
+      '@typescript-eslint/no-unused-expressions': 'warn',
       'indent': [
         'error',
         2
@@ -31,9 +31,6 @@ export default tseslint.config(
         'error',
         'always'
       ]
-    },
-    plugins: {
-      react
     },
     languageOptions: {
       parserOptions: {

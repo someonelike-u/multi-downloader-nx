@@ -1,5 +1,4 @@
-//Originally from https://github.com/Frooastside/node-widevine/blob/main/src/cmac.ts
-
+// Modified version of https://github.com/Frooastside/node-widevine
 import crypto from 'crypto';
 
 export class AES_CMAC {

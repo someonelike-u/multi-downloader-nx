@@ -7,10 +7,9 @@ import packageJson from './package.json';
 
 // plugins
 import { console } from './modules/log';
-import shlp from 'sei-helper';
 import m3u8 from 'm3u8-parsed';
 import streamdl, { M3U8Json } from './modules/hls-download';
-import { exec } from './modules/sei-helper-fixes';
+import Helper from './modules/module.helper';
 
 // custom modules
 import * as fontsData from './modules/module.fontsData';
@@ -95,8 +94,8 @@ export default class Crunchy implements ServiceClass {
     // select mode
     if (argv.silentAuth && !argv.auth) {
       await this.doAuth({
-        username: argv.username ?? await shlp.question('[Q] LOGIN/EMAIL'),
-        password: argv.password ?? await shlp.question('[Q] PASSWORD   ')
+        username: argv.username ?? await Helper.question('[Q] LOGIN/EMAIL: '),
+        password: argv.password ?? await Helper.question('[Q] PASSWORD: ')
       });
     }
     if(argv.dlFonts){
@@ -104,8 +103,8 @@ export default class Crunchy implements ServiceClass {
     }
     else if(argv.auth){
       await this.doAuth({
-        username: argv.username ?? await shlp.question('[Q] LOGIN/EMAIL'),
-        password: argv.password ?? await shlp.question('[Q] PASSWORD   ')
+        username: argv.username ?? await Helper.question('[Q] LOGIN/EMAIL: '),
+        password: argv.password ?? await Helper.question('[Q] PASSWORD: ')
       });
     }
     else if (argv.token) {
@@ -213,9 +212,7 @@ export default class Crunchy implements ServiceClass {
         }
         const fontUrl = fontsData.root + f;
         const getFont = await this.req.getData(fontUrl, {
-          headers: {
-            'User-Agent': api.defaultUserAgent
-          }
+          headers: api.crunchyDefHeader
         });
         if(getFont.ok && getFont.res){
           fs.writeFileSync(fontLoc, Buffer.from(await getFont.res.arrayBuffer()));
@@ -270,6 +267,17 @@ export default class Crunchy implements ServiceClass {
       console.error('Authentication failed!');
       return { isOk: false, reason: new Error('Authentication failed') };
     }
+    // To prevent any Cloudflare errors in the future
+    if (authReq.res.headers.get('Set-Cookie')) {
+      api.crunchyDefHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+      api.crunchyAuthHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+    }
+    if (authReq.headers && authReq.headers['Set-Cookie']) {
+      api.crunchyDefHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyAuthHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyDefHeader['User-Agent'] = authReq.headers['User-Agent'];
+      api.crunchyAuthHeader['User-Agent'] = authReq.headers['User-Agent'];
+    }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
     this.token.expires = new Date(Date.now() + this.token.expires_in);
@@ -298,6 +306,17 @@ export default class Crunchy implements ServiceClass {
       console.error('Anonymous Authentication failed!');
       return;
     }
+    // To prevent any Cloudflare errors in the future
+    if (authReq.res.headers.get('Set-Cookie')) {
+      api.crunchyDefHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+      api.crunchyAuthHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+    }
+    if (authReq.headers && authReq.headers['Set-Cookie']) {
+      api.crunchyDefHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyAuthHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyDefHeader['User-Agent'] = authReq.headers['User-Agent'];
+      api.crunchyAuthHeader['User-Agent'] = authReq.headers['User-Agent'];
+    }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
     this.token.expires = new Date(Date.now() + this.token.expires_in);
@@ -311,8 +330,8 @@ export default class Crunchy implements ServiceClass {
     }
     const profileReqOptions = {
       headers: {
-        Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader,
+        Authorization: `Bearer ${this.token.access_token}`
       },
       useProxy: true
     };
@@ -358,6 +377,17 @@ export default class Crunchy implements ServiceClass {
       }
       return;
     }
+    // To prevent any Cloudflare errors in the future
+    if (authReq.res.headers.get('Set-Cookie')) {
+      api.crunchyDefHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+      api.crunchyAuthHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+    }
+    if (authReq.headers && authReq.headers['Set-Cookie']) {
+      api.crunchyDefHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyAuthHeader['Cookie'] = authReq.headers['Set-Cookie'];
+      api.crunchyDefHeader['User-Agent'] = authReq.headers['User-Agent'];
+      api.crunchyAuthHeader['User-Agent'] = authReq.headers['User-Agent'];
+    }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
     this.token.expires = new Date(Date.now() + this.token.expires_in);
@@ -382,7 +412,6 @@ export default class Crunchy implements ServiceClass {
       const authData = new URLSearchParams({
         'refresh_token': this.token.refresh_token,
         'grant_type': 'refresh_token',
-        //'grant_type': 'etp_rt_cookie',
         'scope': 'offline_access',
         'device_id': uuid,
         'device_name': 'iPhone',
@@ -390,7 +419,7 @@ export default class Crunchy implements ServiceClass {
       }).toString();
       const authReqOpts: reqModule.Params = {
         method: 'POST',
-        headers: {...api.crunchyAuthHeader, Authorization: `Basic ${await this.productionToken()}`, Cookie: `etp_rt=${this.token.refresh_token}`},
+        headers: {...api.crunchyAuthHeader, Authorization: `Basic ${await this.productionToken()}`},
         body: authData
       };
       const authReq = await this.req.getData(api.auth, authReqOpts);
@@ -400,6 +429,17 @@ export default class Crunchy implements ServiceClass {
           console.warn('Token is likely wrong, please login again!');
         }
         return;
+      }
+      // To prevent any Cloudflare errors in the future
+      if (authReq.res.headers.get('Set-Cookie')) {
+        api.crunchyDefHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+        api.crunchyAuthHeader['Cookie'] = authReq.res.headers.get('Set-Cookie') as string;
+      }
+      if (authReq.headers && authReq.headers['Set-Cookie']) {
+        api.crunchyDefHeader['Cookie'] = authReq.headers['Set-Cookie'];
+        api.crunchyAuthHeader['Cookie'] = authReq.headers['Set-Cookie'];
+        api.crunchyDefHeader['User-Agent'] = authReq.headers['User-Agent'];
+        api.crunchyAuthHeader['User-Agent'] = authReq.headers['User-Agent'];
       }
       this.token = await authReq.res.json();
       this.token.device_id = uuid;
@@ -429,7 +469,7 @@ export default class Crunchy implements ServiceClass {
     const cmsTokenReqOpts = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -482,7 +522,7 @@ export default class Crunchy implements ServiceClass {
     const searchReqOpts = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -613,7 +653,7 @@ export default class Crunchy implements ServiceClass {
 
     // set object booleans
     if(iMetadata.duration_ms){
-      oBooleans.push(shlp.formatTime(iMetadata.duration_ms/1000));
+      oBooleans.push(Helper.formatTime(iMetadata.duration_ms/1000));
     }
     if(iMetadata.is_simulcast) {
       oBooleans.push('SIMULCAST');
@@ -750,7 +790,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -792,7 +832,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -832,7 +872,7 @@ export default class Crunchy implements ServiceClass {
     const newlyAddedReqOpts = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -867,7 +907,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -1104,7 +1144,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -1281,12 +1321,7 @@ export default class Crunchy implements ServiceClass {
       const AuthHeaders: RequestInit = {
         headers: {
           Authorization: `Bearer ${this.token.access_token}`,
-          'X-Cr-Disable-Drm': 'true',
-          'X-Cr-Enable-Drm': 'false',
-          'X-Cr-Stream-Limits': 'false',
-          'User-Agent': api.defaultUserAgent
-          //'X-Cr-Segment-CDN': 'all',
-          //'User-Agent': 'Crunchyroll/1.8.0 Nintendo Switch/12.3.12.0 UE4/4.27'
+          ...api.crunchyDefHeader
         }
       };
 
@@ -1317,17 +1352,13 @@ export default class Crunchy implements ServiceClass {
       if (options.chapters) {
         //Make Chapter Request
         const chapterRequest = await this.req.getData(`https://static.crunchyroll.com/skip-events/production/${currentMediaId}.json`, {
-          headers: {
-            'User-Agent': api.defaultUserAgent
-          }
+          headers: api.crunchyDefHeader
         });
         if(!chapterRequest.ok || !chapterRequest.res){
         //Old Chapter Request Fallback
           console.warn('Chapter request failed, attempting old API');
           const oldChapterRequest = await this.req.getData(`https://static.crunchyroll.com/datalab-intro-v2/${currentMediaId}.json`, {
-            headers: {
-              'User-Agent': api.defaultUserAgent
-            }
+            headers: api.crunchyDefHeader
           });
           if(!oldChapterRequest.ok || !oldChapterRequest.res) {
             console.warn('Old Chapter API request failed');
@@ -1428,7 +1459,7 @@ export default class Crunchy implements ServiceClass {
 
       let playStream: CrunchyPlayStream | null = null;
       if (options.cstream !== 'none') {
-        const playbackReq = await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v2/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyPlayStreams[options.cstream]}/play`, AuthHeaders);
+        const playbackReq = await this.req.getData(`https://www.crunchyroll.com/playback/v2/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyPlayStreams[options.cstream]}/play`, AuthHeaders);
         if (!playbackReq.ok || !playbackReq.res) {
           console.warn('Request Stream URLs FAILED!');
         } else {
@@ -1587,10 +1618,10 @@ export default class Crunchy implements ServiceClass {
 
       // Delete the stream if it's not needed
       if (options.novids && options.noaudio) {
-        if (playStream) {
-          await this.refreshToken(true, true);
-          await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
-        }
+        // if (playStream) {
+        //   await this.refreshToken(true, true);
+        //   await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+        // }
       }
 
       if(!dlFailed && curStream !== undefined && !(options.novids && options.noaudio)){
@@ -1602,10 +1633,10 @@ export default class Crunchy implements ServiceClass {
           const streamPlaylistBody = await streamPlaylistsReq.res.text();
           if (streamPlaylistBody.match('MPD')) {
             //We have the stream, so go ahead and delete the active stream
-            if (playStream) {
-              await this.refreshToken(true, true);
-              await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
-            }
+            // if (playStream) {
+            //   await this.refreshToken(true, true);
+            //   await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+            // }
 
             //Parse MPD Playlists
             const streamPlaylists = await parse(streamPlaylistBody, langsData.findLang(langsData.fixLanguageTag(pbData.meta.audio_locale as string) || ''), curStream.url.match(/.*\.urlset\//)[0]);
@@ -1776,68 +1807,129 @@ export default class Crunchy implements ServiceClass {
 
             //Handle Decryption if needed
             if ((chosenVideoSegments.pssh_wvd ||chosenVideoSegments.pssh_prd || chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd) && (videoDownloaded || audioDownloaded)) {
-              const assetIdRegex = chosenVideoSegments.segments[0].uri.match(/\/assets\/(?:p\/)?([^_,]+)/);
-              const assetId = assetIdRegex ? assetIdRegex[1] : null;
-              const sessionId = new Date().getUTCMilliseconds().toString().padStart(3, '0') + process.hrtime.bigint().toString().slice(0, 13);
+              // Part of the old (now deprecated) DRM system
+              // const assetIdRegex = chosenVideoSegments.segments[0].uri.match(/\/assets\/(?:p\/)?([^_,]+)/);
+              // const assetId = assetIdRegex ? assetIdRegex[1] : null;
+              // const sessionId = new Date().getUTCMilliseconds().toString().padStart(3, '0') + process.hrtime.bigint().toString().slice(0, 13);
+
               console.info('Decryption Needed, attempting to decrypt');
 
-              const decReq = await this.req.getData(`${api.drm}`, {
-                'method': 'POST',
-                'body': JSON.stringify({
-                  'accounting_id': 'crunchyroll',
-                  'asset_id': assetId,
-                  'session_id': sessionId,
-                  'user_id': this.token.account_id
-                }),
-                headers: {
-                  'User-Agent': api.defaultUserAgent
-                }
-              });
-              if(!decReq.ok || !decReq.res){
-                console.error('Request to DRM Authentication failed:', decReq.error?.res.status, decReq.error?.message);
-                return undefined;
-              }
-              const authData = await decReq.res.json() as {'custom_data': string, 'token': string};
+              // Part of the old (now deprecated) DRM system
+              // const decReq = await this.req.getData(`${api.drm}`, {
+              //   'method': 'POST',
+              //   'body': JSON.stringify({
+              //     'accounting_id': 'crunchyroll',
+              //     'asset_id': assetId,
+              //     'session_id': sessionId,
+              //     'user_id': this.token.account_id
+              //   }),
+              //   headers: {
+              //     'User-Agent': api.defaultUserAgent
+              //   }
+              // });
+              // if(!decReq.ok || !decReq.res){
+              //   console.error('Request to DRM Authentication failed:', decReq.error?.res.status, decReq.error?.message);
+              //   return undefined;
+              // }
+              // const authData = await decReq.res.json() as {'custom_data': string, 'token': string};
 
-              let encryptionKeys;
+              let encryptionKeysVideo;
+              let encryptionKeysAudio;
 
+              // New Crunchyroll DRM endpoint for Widevine
               if (cdm === 'widevine') {
-                encryptionKeys = await getKeysWVD(chosenVideoSegments.pssh_wvd, 'https://lic.drmtoday.com/license-proxy-widevine/cenc/', {
-                  'dt-custom-data': authData.custom_data,
-                  'x-dt-auth-token': authData.token
+                await this.refreshToken(true, true);
+                encryptionKeysVideo = await getKeysWVD(chosenVideoSegments.pssh_wvd, api.drm_widevine, {
+                  Authorization: `Bearer ${this.token.access_token}`,
+                  ...api.crunchyDefHeader,
+                  Pragma: 'no-cache',
+                  'Cache-Control': 'no-cache',
+                  'content-type': 'application/octet-stream',
+                  'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
+                  'x-cr-video-token': playStream!.token
                 });
+
+                // Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
+                if (chosenAudioSegments.pssh_wvd && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd) {
+                  await this.refreshToken(true, true);
+                  encryptionKeysAudio = await getKeysWVD(chosenAudioSegments.pssh_wvd, api.drm_widevine, {
+                    Authorization: `Bearer ${this.token.access_token}`,
+                    ...api.crunchyDefHeader,
+                    Pragma: 'no-cache',
+                    'Cache-Control': 'no-cache',
+                    'content-type': 'application/octet-stream',
+                    'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
+                    'x-cr-video-token': playStream!.token
+                  });
+                } else {
+                  encryptionKeysAudio = encryptionKeysVideo;
+                }
               }
 
-              if (cdm === 'playready') {
-                encryptionKeys = await getKeysPRD(chosenVideoSegments.pssh_prd, 'https://lic.drmtoday.com/license-proxy-headerauth/drmtoday/RightsManager.asmx', {
-                  'dt-custom-data': authData.custom_data,
-                  'x-dt-auth-token': authData.token
-                });
-              }
+              // New Crunchyroll DRM endpoint for Playready (currently broken on Crunchyrolls part and therefore disabled)
+              // if (cdm === 'playready') {
+              //   await this.refreshToken(true, true);
+              //   encryptionKeysVideo = await getKeysPRD(chosenVideoSegments.pssh_prd, api.drm_playready, {
+              //     Authorization: `Bearer ${this.token.access_token}`,
+              //     'User-Agent': api.defaultUserAgent,
+              //     Pragma: 'no-cache',
+              //     'Cache-Control': 'no-cache',
+              //     'content-type': 'application/octet-stream',
+              //     'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
+              //     'x-cr-video-token': playStream!.token
+              //   });
 
-              if (!encryptionKeys || encryptionKeys.length == 0) {
+              //   // Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
+              //   if (chosenAudioSegments.pssh_prd && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd) {
+              //     await this.refreshToken(true, true);
+              //     encryptionKeysAudio = await getKeysPRD(chosenAudioSegments.pssh_prd, api.drm_playready, {
+              //       Authorization: `Bearer ${this.token.access_token}`,
+              //       'User-Agent': api.defaultUserAgent,
+              //       Pragma: 'no-cache',
+              //       'Cache-Control': 'no-cache',
+              //       'content-type': 'application/octet-stream',
+              //       'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
+              //       'x-cr-video-token': playStream!.token
+              //     });
+              //   } else {
+              //     encryptionKeysAudio = encryptionKeysVideo;
+              //   }
+              // }
+
+              // Part of the old (now deprecated) DRM system
+              // if (cdm === 'playready') {
+              //   encryptionKeys = await getKeysPRD(chosenVideoSegments.pssh_prd, 'https://lic.drmtoday.com/license-proxy-headerauth/drmtoday/RightsManager.asmx', {
+              //     'dt-custom-data': authData.custom_data,
+              //     'x-dt-auth-token': authData.token
+              //   });
+              // }
+
+              if (!encryptionKeysVideo || encryptionKeysVideo.length == 0 || !encryptionKeysAudio || encryptionKeysAudio.length == 0) {
                 console.error('Failed to get encryption keys');
                 return undefined;
               }
+
               /*const keys = {} as Record<string, string>;
               encryptionKeys.forEach(function(key) {
                 keys[key.kid] = key.key;
               });*/
 
               if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-                let commandBase = `--show-progress --key ${encryptionKeys[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeys[cdm === 'playready' ? 0 : 1].key} `;
-                let commandVideo = commandBase+`"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
-                let commandAudio = commandBase+`"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
+                let commandBaseVideo = `--show-progress --key ${encryptionKeysVideo[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeysVideo[cdm === 'playready' ? 0 : 1].key} `;
+                let commandBaseAudio = `--show-progress --key ${encryptionKeysAudio[cdm === 'playready' ? 0 : 1].kid}:${encryptionKeysAudio[cdm === 'playready' ? 0 : 1].key} `;
+                let commandVideo = commandBaseVideo+`"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
+                let commandAudio = commandBaseAudio+`"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
 
                 if (this.cfg.bin.shaka) {
-                  commandBase = ` --enable_raw_key_decryption ${encryptionKeys.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
-                  commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"`+commandBase;
-                  commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"`+commandBase;
+                  commandBaseVideo = ` --enable_raw_key_decryption ${encryptionKeysVideo.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
+                  commandBaseAudio = ` --enable_raw_key_decryption ${encryptionKeysAudio.map(kb => '--keys key_id='+kb.kid+':key='+kb.key).join(' ')}`;
+                  commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"`+commandBaseVideo;
+                  commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"`+commandBaseAudio;
                 }
 
                 if (videoDownloaded) {
                   console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
-                  const decryptVideo = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
+                  const decryptVideo = Helper.exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
                   if (!decryptVideo.isOk) {
                     console.error(decryptVideo.err);
                     console.error(`Decryption failed with exit code ${decryptVideo.err.code}`);
@@ -1861,7 +1953,7 @@ export default class Crunchy implements ServiceClass {
 
                 if (audioDownloaded) {
                   console.info('Started decrypting audio,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
-                  const decryptAudio = exec(this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
+                  const decryptAudio = Helper.exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
                   if (!decryptAudio.isOk) {
                     console.error(decryptAudio.err);
                     console.error(`Decryption failed with exit code ${decryptAudio.err.code}`);
@@ -1883,7 +1975,7 @@ export default class Crunchy implements ServiceClass {
                   }
                 }
               } else {
-                console.warn('mp4decrypt/shaka not found, files need decryption. Decryption Keys:', encryptionKeys);
+                console.warn('mp4decrypt/shaka not found, files need decryption. Decryption Keys:', encryptionKeysVideo, encryptionKeysAudio);
               }
             } else {
               if (videoDownloaded) {
@@ -2007,19 +2099,17 @@ export default class Crunchy implements ServiceClass {
               const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
               console.info(`Output filename: ${outFile}`);
               const chunkPage = await this.req.getData(selPlUrl, {
-                headers: {
-                  'User-Agent': api.defaultUserAgent
-                }
+                headers: api.crunchyDefHeader,
               });
               if(!chunkPage.ok || !chunkPage.res){
                 console.error('CAN\'T FETCH VIDEO PLAYLIST!');
                 dlFailed = true;
               } else {
                 // We have the stream, so go ahead and delete the active stream
-                if (playStream) {
-                  await this.refreshToken(true, true);
-                  await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
-                }
+                // if (playStream) {
+                //   await this.refreshToken(true, true);
+                //   await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${playStream.token}`, {...{method: 'DELETE'}, ...AuthHeaders});
+                // }
 
                 const chunkPageBody = await chunkPage.res.text();
                 const chunkPlaylist = m3u8(chunkPageBody);
@@ -2159,9 +2249,7 @@ export default class Crunchy implements ServiceClass {
               continue;
             if(options.dlsubs.includes('all') || options.dlsubs.includes(langItem.locale)){
               const subsAssReq = await this.req.getData(subsItem.url, {
-                headers: {
-                  'User-Agent': api.defaultUserAgent
-                }
+                headers: api.crunchyDefHeader
               });
               if(subsAssReq.ok && subsAssReq.res){
                 let sBody = await subsAssReq.res.text();
@@ -2368,7 +2456,8 @@ export default class Crunchy implements ServiceClass {
 
     for (const key of Object.keys(sortedEpisodes)) {
       const item = sortedEpisodes[key];
-      console.info(`[${key}] [${item.items[0].upload_date ? new Date(item.items[0].upload_date).toISOString().slice(0, 10) : '0000-00-00'}] ${
+      const epNum = key.startsWith('E') ? (`E${data?.absolute ? (item.items[0].episode_number?.toString() || item.items[0].episode) : key.slice(1)}`) : key;
+      console.info(`[${data?.absolute ? epNum : key}] [${item.items[0].upload_date ? new Date(item.items[0].upload_date).toISOString().slice(0, 10) : '0000-00-00'}] ${
         item.items.find(a => !a.season_title.match(/\(\w+ Dub\)/))?.season_title ?? item.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd()
       } - Season ${item.items[0].season_number} - ${item.items[0].title} [${
         item.items.map((a, index) => {
@@ -2384,8 +2473,14 @@ export default class Crunchy implements ServiceClass {
     return { data: sortedEpisodes, list: Object.entries(sortedEpisodes).map(([key, value]) => {
       const images = (value.items[0].images.thumbnail ?? [[ { source: '/notFound.png' } ]])[0];
       const seconds = Math.floor(value.items[0].duration_ms / 1000);
+      let epNum;
+      if (data?.absolute) {
+        epNum = value.items[0].episode_number !== null && value.items[0].episode_number !== undefined ? value.items[0].episode_number.toString() : (value.items[0].episode !== null && value.items[0].episode !== undefined ? value.items[0].episode : (key.startsWith('E') ? key.slice(1) : key));
+      } else {
+        epNum = key.startsWith('E') ? key.slice(1) : key;
+      }
       return {
-        e: key.startsWith('E') ? key.slice(1) : key,
+        e: epNum,
         lang: value.langs.map(a => a?.code),
         name: value.items[0].title,
         season: value.items[0].season_number.toString(),
@@ -2405,7 +2500,7 @@ export default class Crunchy implements ServiceClass {
     console.info('');
     console.info('-'.repeat(30));
     console.info('');
-    const selected = this.itemSelectMultiDub(episodes, data.dubLang, data.but, data.all, data.e);
+    const selected = this.itemSelectMultiDub(episodes, data.dubLang, data.but, data.all, data.e, data.absolute);
     for (const key of Object.keys(selected)) {
       const item = selected[key];
       console.info(`[S${item.season}E${item.episodeNumber}] - ${item.episodeTitle} [${
@@ -2420,7 +2515,7 @@ export default class Crunchy implements ServiceClass {
   public itemSelectMultiDub (eps: Record<string, {
     items: CrunchyEpisode[],
     langs: langsData.LanguageItem[]
-  }>, dubLang: string[], but?: boolean, all?: boolean, e?: string, ) {
+  }>, dubLang: string[], but?: boolean, all?: boolean, e?: string, absolute?: boolean) {
     const doEpsFilter = parseSelect(e as string);
 
     const ret: Record<string, CrunchyEpMeta> = {};
@@ -2441,7 +2536,13 @@ export default class Crunchy implements ServiceClass {
           item.series_title = 'NO_TITLE';
         }
 
-        const epNum = key.startsWith('E') ? key.slice(1) : key;
+        let epNum;
+        if (absolute) {
+          epNum = item.episode_number !== null && item.episode_number !== undefined ? item.episode_number.toString() : (item.episode !== null && item.episode !== undefined ? item.episode : (key.startsWith('E') ? key.slice(1) : key));
+        } else {
+          epNum = key.startsWith('E') ? key.slice(1) : key;
+        }
+
         // set data
         const images = (item.images.thumbnail ?? [[ { source: '/notFound.png' } ]])[0];
         const epMeta: CrunchyEpMeta = {
@@ -2475,7 +2576,7 @@ export default class Crunchy implements ServiceClass {
             item.playback = item.streams_link;
           }
         }
-        // find episode numbers
+
         if(item.playback && ((but && !doEpsFilter.isSelected([epNum, item.id])) || (all || (doEpsFilter.isSelected([epNum, item.id])) && !but))) {
           if (Object.prototype.hasOwnProperty.call(ret, key)) {
             const epMe = ret[key];
@@ -2534,7 +2635,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };
@@ -2563,7 +2664,7 @@ export default class Crunchy implements ServiceClass {
     const AuthHeaders = {
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
-        'User-Agent': api.defaultUserAgent
+        ...api.crunchyDefHeader
       },
       useProxy: true
     };

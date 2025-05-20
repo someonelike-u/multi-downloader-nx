@@ -7,7 +7,6 @@ import packageJson from './package.json';
 
 // plugins
 import { console } from './modules/log';
-import shlp from 'sei-helper';
 import streamdl, { M3U8Json } from './modules/hls-download';
 
 // custom modules
@@ -17,10 +16,11 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import vtt2ass from './modules/module.vtt2ass';
+import Helper from './modules/module.helper';
 
 // load req
 import { domain, api } from './modules/module.api-urls';
-import * as reqModule from './modules/module.req';
+import * as reqModule from './modules/module.fetch';
 import { DownloadedMedia } from './@types/hidiveTypes';
 import parseFileName, { Variable } from './modules/module.filename';
 import { downloaded } from './modules/module.downloadArchive';
@@ -36,8 +36,7 @@ import { NewHidiveEpisode } from './@types/newHidiveEpisode';
 import { NewHidivePlayback, Subtitle } from './@types/newHidivePlayback';
 import { MPDParsed, parse } from './modules/module.transform-mpd';
 import { canDecrypt, getKeysWVD, cdm, getKeysPRD } from './modules/cdm';
-import { exec } from './modules/sei-helper-fixes';
-import { KeyContainer } from './modules/license';
+import { KeyContainer } from './modules/widevine/license';
 
 export default class Hidive implements ServiceClass { 
   public cfg: yamlCfg.ConfigObject;
@@ -71,8 +70,8 @@ export default class Hidive implements ServiceClass {
     if (argv.auth) {
       //Authenticate
       await this.doAuth({
-        username: argv.username ?? await shlp.question('[Q] LOGIN/EMAIL'),
-        password: argv.password ?? await shlp.question('[Q] PASSWORD   ')
+        username: argv.username ?? await Helper.question('[Q] LOGIN/EMAIL: '),
+        password: argv.password ?? await Helper.question('[Q] PASSWORD: ')
       });
     } else if (argv.search && argv.search.length > 2){
       await this.doSearch({ ...argv, search: argv.search as string });
@@ -152,7 +151,7 @@ export default class Hidive implements ServiceClass {
     };
     let apiReq = await this.req.getData(options.url, apiReqOpts);
     if(!apiReq.ok || !apiReq.res){
-      if (apiReq.error && apiReq.error.res?.statusCode == 401) {
+      if (apiReq.error && apiReq.error.res?.status == 401) {
         console.warn('Token expired, refreshing token and retrying.');
         if (await this.refreshToken()) {
           if (authType == 'other') {
@@ -208,7 +207,7 @@ export default class Hidive implements ServiceClass {
       console.error('Authentication failed!');
       return { isOk: false, reason: new Error('Authentication failed') };
     }
-    const tokens: Record<string, string> = JSON.parse(authReq.res.body);
+    const tokens: Record<string, string> = JSON.parse(await authReq.res.text());
     for (const token in tokens) {
       this.token[token] = tokens[token];
     }
@@ -224,7 +223,7 @@ export default class Hidive implements ServiceClass {
       console.error('Authentication failed!');
       return false;
     }
-    const tokens: Record<string, string> = JSON.parse(authReq.res.body);
+    const tokens: Record<string, string> = JSON.parse(await authReq.res.text());
     for (const token in tokens) {
       this.token[token] = tokens[token];
     }
@@ -245,7 +244,7 @@ export default class Hidive implements ServiceClass {
         console.error('Token refresh failed, reinitializing session...');
         return this.initSession();
       }
-      const tokens: Record<string, string> = JSON.parse(authReq.res.body);
+      const tokens: Record<string, string> = JSON.parse(await authReq.res.text());
       for (const token in tokens) {
         this.token[token] = tokens[token];
       }
@@ -260,7 +259,7 @@ export default class Hidive implements ServiceClass {
       console.error('Failed to initialize session.');
       return false;
     }
-    const tokens: Record<string, string> = JSON.parse(authReq.res.body).authentication;
+    const tokens: Record<string, string> = JSON.parse(await authReq.res.text()).authentication;
     for (const token in tokens) {
       this.token[token] = tokens[token];
     }
@@ -284,7 +283,7 @@ export default class Hidive implements ServiceClass {
       console.error('Search FAILED!');
       return { isOk: false, reason: new Error('Search failed. No more information provided') };
     }
-    const searchData = JSON.parse(searchReq.res.body) as NewHidiveSearch;
+    const searchData = JSON.parse(await searchReq.res.text()) as NewHidiveSearch;
     const searchItems: Hit[] = [];
     console.info('Search Results:');
     for (const category of searchData.results) {
@@ -318,7 +317,7 @@ export default class Hidive implements ServiceClass {
       console.error('Failed to get Series Data');
       return { isOk: false };
     }
-    const seriesData = JSON.parse(getSeriesData.res.body) as NewHidiveSeries;
+    const seriesData = JSON.parse(await getSeriesData.res.text()) as NewHidiveSeries;
     return { isOk: true, value: seriesData };
   }
 
@@ -334,7 +333,7 @@ export default class Hidive implements ServiceClass {
       console.error('Failed to get Season Data');
       return { isOk: false };
     }
-    const seasonData = JSON.parse(getSeasonData.res.body) as NewHidiveSeason;
+    const seasonData = JSON.parse(await getSeasonData.res.text()) as NewHidiveSeason;
     return { isOk: true, value: seasonData };
   }
 
@@ -506,7 +505,7 @@ export default class Hidive implements ServiceClass {
       console.error('Failed to get episode data');
       return { isOk: false, reason: new Error('Failed to get Episode Data') };
     }
-    const episodeData = JSON.parse(episodeDataReq.res.body) as NewHidiveEpisode;
+    const episodeData = JSON.parse(await episodeDataReq.res.text()) as NewHidiveEpisode;
 
     if (!episodeData.playerUrlCallback) {
       console.error('Failed to download episode: You do not have access to this');
@@ -519,7 +518,7 @@ export default class Hidive implements ServiceClass {
       console.error('Playback Request Failed');
       return { isOk: false, reason: new Error('Playback request failed') };
     }
-    const playbackData = JSON.parse(playbackReq.res.body) as NewHidivePlayback;
+    const playbackData = JSON.parse(await playbackReq.res.text()) as NewHidivePlayback;
 
     //Get actual MPD
     const mpdRequest = await this.req.getData(playbackData.dash[0].url);
@@ -527,7 +526,7 @@ export default class Hidive implements ServiceClass {
       console.error('MPD Request Failed');
       return { isOk: false, reason: new Error('MPD request failed') };
     }
-    const mpd = mpdRequest.res.body as string;
+    const mpd = await mpdRequest.res.text() as string;
 
     selectedEpisode.jwtToken = playbackData.dash[0].drm.jwtToken;
 
@@ -566,7 +565,7 @@ export default class Hidive implements ServiceClass {
       console.error('Failed to get episode data');
       return { isOk: false, reason: new Error('Failed to get Episode Data') };
     }
-    const episodeData = JSON.parse(episodeDataReq.res.body) as NewHidiveEpisode;
+    const episodeData = JSON.parse(await episodeDataReq.res.text()) as NewHidiveEpisode;
 
     if (episodeData.title.includes(' - ') && episodeData.episodeInformation) {
       episodeData.episodeInformation.episodeNumber = parseFloat(episodeData.title.split(' - ')[0].replace('E', ''));
@@ -599,7 +598,7 @@ export default class Hidive implements ServiceClass {
       console.error('Playback Request Failed');
       return { isOk: false, reason: new Error('Playback request failed') };
     }
-    const playbackData = JSON.parse(playbackReq.res.body) as NewHidivePlayback;
+    const playbackData = JSON.parse(await playbackReq.res.text()) as NewHidivePlayback;
 
     //Get actual MPD
     const mpdRequest = await this.req.getData(playbackData.dash[0].url);
@@ -607,7 +606,7 @@ export default class Hidive implements ServiceClass {
       console.error('MPD Request Failed');
       return { isOk: false, reason: new Error('MPD request failed') };
     }
-    const mpd = mpdRequest.res.body as string;
+    const mpd = await mpdRequest.res.text() as string;
 
     const selectedEpisode: NewHidiveEpisodeExtra = {
       ...episodeData,
@@ -839,7 +838,7 @@ export default class Hidive implements ServiceClass {
             }
 
             console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
-            const decryptVideo = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
+            const decryptVideo = Helper.exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandVideo);
             if (!decryptVideo.isOk) {
               console.error(decryptVideo.err);
               console.error(`Decryption failed with exit code ${decryptVideo.err.code}`);
@@ -925,7 +924,7 @@ export default class Hidive implements ServiceClass {
             }
 
             console.info('Started decrypting audio');
-            const decryptAudio = exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
+            const decryptAudio = Helper.exec(this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt', this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`, commandAudio);
             if (!decryptAudio.isOk) {
               console.error(decryptAudio.err);
               console.error(`Decryption failed with exit code ${decryptAudio.err.code}`);
@@ -989,7 +988,7 @@ export default class Hidive implements ServiceClass {
             if (getVttContent.ok && getVttContent.res) {
               console.info(`Subtitle Downloaded: ${sub.url}`);
               //vttConvert(getVttContent.res.body, false, subLang.name, fontSize);
-              const sBody = vtt2ass(undefined, chosenFontSize, getVttContent.res.body, '', subsMargin, options.fontName, options.combineLines);
+              const sBody = vtt2ass(undefined, chosenFontSize, await getVttContent.res.text(), '', subsMargin, options.fontName, options.combineLines);
               sxData.title = `${subLang.language} / ${sxData.title}`;
               sxData.fonts = fontsData.assFonts(sBody) as Font[];
               fs.writeFileSync(sxData.path, sBody);
