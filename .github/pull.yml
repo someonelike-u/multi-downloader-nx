@@ -1,5 +1,6 @@
 version: "1"
 rules:
-  - base: master
-    upstream: someonelike-u:master # change `wei` to the owner of upstream repo
-    mergeMethod: hardreset
+  - base: main
+    upstream: anidl:master
+    mergeMethod: merge
+    mergeUnstable: false
