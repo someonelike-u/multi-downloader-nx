@@ -1,4 +1,4 @@
-# multi-downloader-nx (v5.5.0)
+# multi-downloader-nx (v5.5.1)
 
 If you find any bugs in this documentation or in the program itself please report it [over on GitHub](https://github.com/anidl/multi-downloader-nx/issues).
 
@@ -214,6 +214,12 @@ Select a specific Crunchyroll video playback endpoint by device.
 | Crunchyroll | `--astream ${device}` | `string` | `No`| `--as` | [`chrome`, `firefox`, `safari`, `edge`, `fallback`, `ps4`, `ps5`, `switch`, `xboxone`, `vidaa`, `samsungtv`, `lgtv`, `rokutv`, `chromecast`, `firetv`, `androidtv`, `android`, `androidtab`, `none`] | `firefox`| `astream: ` |
 
 Select a specific Crunchyroll audio playback endpoint by device.
+#### `--tsd`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| Crunchyroll | `--tsd ` | `boolean` | `No`| `NaN` | `NaN` |
+
+(Total Session Death) Kills all active Crunchyroll Streaming Sessions to prevent getting the "TOO_MANY_ACTIVE_STREAMS" error
 #### `--hslang`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
