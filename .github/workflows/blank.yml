@@ -23,10 +23,10 @@ jobs:
           git fetch upstream
       - name: Sync with upstream/main
         run: |
-          git fetch upstream main
-          git checkout -B main origin/main
-          git merge upstream/main
-          git push origin main
+          git fetch upstream master
+          git checkout -B main origin/master
+          git merge upstream/master
+          git push origin master
       - name: Clean up
         run: |
           git remote remove upstream
