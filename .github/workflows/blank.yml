@@ -11,16 +11,12 @@ jobs:
     outputs:
       changes_pushed: ${{ steps.check_diff.outputs.changes_pushed }}
     steps:
-      - uses: tgymnich/fork-sync@v2.0.10
-        with:
-          token: ${{ secrets.PERSONAL_TOKEN }}
-          owner: someonelike-u
-          base: master
-          head: master
-          auto_approve: false
-          auto_merge: true
-      - name: Checkout repository
+      - name: Checkout your forked repository
         uses: actions/checkout@v4
+        with:
+          repository: someonelike-u/multi-downloader-nx
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          fetch-depth: 0
       - name: Check if there are new commits
         id: check_diff
         run: |
