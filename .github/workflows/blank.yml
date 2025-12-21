@@ -17,6 +17,10 @@ jobs:
           repository: someonelike-u/multi-downloader-nx
           token: ${{ secrets.PERSONAL_TOKEN }}
           fetch-depth: 0
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
       - name: Add upstream repository
         run: |
           git remote add upstream https://github.com/anidl/multi-downloader-nx.git
