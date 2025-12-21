@@ -17,6 +17,19 @@ jobs:
           repository: someonelike-u/multi-downloader-nx
           token: ${{ secrets.PERSONAL_TOKEN }}
           fetch-depth: 0
+      - name: Add upstream repository
+        run: |
+          git remote add upstream https://github.com/anidl/multi-downloader-nx.git
+          git fetch upstream
+      - name: Sync with upstream/main
+        run: |
+          git fetch upstream main
+          git checkout -B main origin/main
+          git merge upstream/main
+          git push origin main
+      - name: Clean up
+        run: |
+          git remote remove upstream
       - name: Check if there are new commits
         id: check_diff
         run: |
