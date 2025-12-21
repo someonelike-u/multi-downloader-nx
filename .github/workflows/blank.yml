@@ -11,29 +11,16 @@ jobs:
     outputs:
       changes_pushed: ${{ steps.check_diff.outputs.changes_pushed }}
     steps:
-      - name: Checkout your forked repository
-        uses: actions/checkout@v4
+      - uses: tgymnich/fork-sync@v2.0.10
         with:
-          repository: someonelike-u/multi-downloader-nx
           token: ${{ secrets.PERSONAL_TOKEN }}
-          fetch-depth: 0
-      - name: Configure Git identity
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Add upstream repository
-        run: |
-          git remote add upstream https://github.com/anidl/multi-downloader-nx.git
-          git fetch upstream
-      - name: Sync with upstream/main
-        run: |
-          git fetch upstream master
-          git checkout -B main origin/master
-          git merge upstream/master
-          git push origin master
-      - name: Clean up
-        run: |
-          git remote remove upstream
+          owner: someonelike-u
+          base: master
+          head: master
+          auto_approve: false
+          auto_merge: true
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Check if there are new commits
         id: check_diff
         run: |
