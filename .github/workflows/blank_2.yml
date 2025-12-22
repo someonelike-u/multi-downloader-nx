@@ -114,12 +114,10 @@ jobs:
           echo "Upload URL: $UPLOAD_URL"
           echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
 
-      - name: Upload release assets
-        uses: actions/upload-release-asset@v1
+      - name: Upload assets to the GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_name: multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
-          asset_path: ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
-          asset_content_type: application/x-7z-compressed
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            files: |
+                ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
+                ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z.sha256
+            fail_on_unmatched_files: true
