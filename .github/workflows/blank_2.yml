@@ -119,6 +119,7 @@ jobs:
           UPLOAD_URL=$(cat upload_url.txt)
           echo "Upload URL: $UPLOAD_URL"
           echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+          echo ${{ github.ref_type }}
 
       - name: Upload assets to the GitHub Release
         uses: softprops/action-gh-release@v2
