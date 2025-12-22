@@ -104,14 +104,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
         
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 8.6.6
+          version: latest
           
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 24
           check-latest: true
 
       - name: Fetch latest upstream changes
