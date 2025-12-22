@@ -32,6 +32,8 @@ jobs:
           echo "FORKED_VERSION=$FORKED_VERSION" >> $GITHUB_ENV
       - name: Associate tag to a commit
         run: |
+          git config user.name "GitHub Action"
+          git config user.email "bloop@blorp.com"
           git tag ${{ env.FORKED_VERSION }}
           git push origin ${{ env.FORKED_VERSION }}
       - name: Create GitHub Release
