@@ -30,6 +30,13 @@ jobs:
           ORIGINAL_VERSION=${{ env.LATEST_TAG }}
           FORKED_VERSION="${ORIGINAL_VERSION}.1"
           echo "FORKED_VERSION=$FORKED_VERSION" >> $GITHUB_ENV
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v2.9.0
+        with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            push: true
+            tags: |
+                "multidl/multi-downloader-nx:${{ env.FORKED_VERSION }}"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -98,7 +105,7 @@ jobs:
           test -n $(node -p -e "require('./package.json').name") &&
           test -n $(node -p -e "require('./package.json').version") &&
           echo PACKAGE_NAME=$(node -p -e "require('./package.json').name") >> $GITHUB_ENV &&
-          echo PACKAGE_VERSION=5.6.8.1 >> $GITHUB_ENV || exit 1
+          echo PACKAGE_VERSION=$(node -p -e "require('./package.json').version") >> $GITHUB_ENV || exit 1
 
       - name: Make build
         run: pnpm run build-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}
