@@ -122,6 +122,7 @@ jobs:
 
       - name: Upload assets to the GitHub Release
         uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'v$PACKAGE_VERSION'
         with:
             files: |
                 ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
