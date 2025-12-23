@@ -83,6 +83,7 @@ jobs:
           git checkout master
           git reset --hard origin/master  # Évite d'avoir une version en cache
           git pull origin master --force  # Assure d'avoir le dernier package.json
+          echo ${{ env.FORKED_VERSION }}
           git checkout --progress --force refs/tags/${{ env.FORKED_VERSION }} # Pour l'upload des assets
 
       - name: Debug package.json version
