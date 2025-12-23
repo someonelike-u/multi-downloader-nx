@@ -30,12 +30,6 @@ jobs:
           ORIGINAL_VERSION=${{ env.LATEST_TAG }}
           FORKED_VERSION="${ORIGINAL_VERSION}.1"
           echo "FORKED_VERSION=$FORKED_VERSION" >> $GITHUB_ENV
-      - name: Associate tag to a commit
-        run: |
-          git config user.name "GitHub Action"
-          git config user.email "bloop@blorp.com"
-          git tag ${{ env.FORKED_VERSION }}
-          git push origin ${{ env.FORKED_VERSION }}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,6 +83,7 @@ jobs:
           git checkout master
           git reset --hard origin/master  # Évite d'avoir une version en cache
           git pull origin master --force  # Assure d'avoir le dernier package.json
+          git checkout --progress --force refs/tags/${{ env.FORKED_VERSION }} # Pour l'upload des assets
 
       - name: Debug package.json version
         run: |
@@ -104,7 +99,7 @@ jobs:
           test -n $(node -p -e "require('./package.json').name") &&
           test -n $(node -p -e "require('./package.json').version") &&
           echo PACKAGE_NAME=$(node -p -e "require('./package.json').name") >> $GITHUB_ENV &&
-          echo PACKAGE_VERSION=$(node -p -e "require('./package.json').version") >> $GITHUB_ENV || exit 1
+          echo PACKAGE_VERSION=${{ env.FORKED_VERSION }} >> $GITHUB_ENV || exit 1
 
       - name: Make build
         run: pnpm run build-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}
