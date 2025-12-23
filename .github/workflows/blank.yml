@@ -138,7 +138,7 @@ jobs:
           echo PACKAGE_VERSION=$(node -p -e "require('./package.json').version") >> $GITHUB_ENV || exit 1
 
       - name: Make build
-        run: pnpm run build-${{ matrix.build_type }}-${{ matrix.gui }}
+        run: pnpm run build-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}
 
       - name: Download Upload URL artifact
         uses: actions/download-artifact@v4
@@ -151,12 +151,11 @@ jobs:
           echo "Upload URL: $UPLOAD_URL"
           echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
 
-      - name: Upload release assets
-        uses: actions/upload-release-asset@v1
+      - name: Upload assets to the GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_name: multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.gui }}.7z
-          asset_path: ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
-          asset_content_type: application/x-7z-compressed
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            tag_name: v${{ env.PACKAGE_VERSION }}
+            files: |
+                ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z
+                ./lib/_builds/multi-downloader-nx-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}.7z.sha256
+            fail_on_unmatched_files: true
