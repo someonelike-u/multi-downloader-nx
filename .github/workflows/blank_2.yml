@@ -97,7 +97,7 @@ jobs:
           test -n $(node -p -e "require('./package.json').name") &&
           test -n $(node -p -e "require('./package.json').version") &&
           echo PACKAGE_NAME=$(node -p -e "require('./package.json').name") >> $GITHUB_ENV &&
-          echo PACKAGE_VERSION=5.6.8.1 >> $GITHUB_ENV || exit 1
+          echo PACKAGE_VERSION=$(node -p -e "require('./package.json').version") >> $GITHUB_ENV || exit 1
 
       - name: Make build
         run: pnpm run build-${{ matrix.build_type }}-${{ matrix.build_arch }}-${{ matrix.gui }}
