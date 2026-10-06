@@ -226,8 +226,6 @@ export default class Crunchy implements ServiceClass {
 				...api.crunchyDefHeader
 			}
 		};
-		// seasons list
-		let episodeList = { total: 0, data: [], meta: {} } as CrunchyEpisodeList;
 		//get episode info
 		const reqEpsListOpts = [
 			api.cms_bucket,
@@ -250,7 +248,7 @@ export default class Crunchy implements ServiceClass {
 		}
 		//CrunchyEpisodeList
 		const episodeListAndroid = (await reqEpsList.res.json()) as CrunchyAndroidEpisodes;
-		episodeList = {
+		const episodeList: CrunchyEpisodeList = {
 			total: episodeListAndroid.total,
 			data: episodeListAndroid.items,
 			meta: {}
@@ -368,26 +366,6 @@ export default class Crunchy implements ServiceClass {
 		}
 		console.info('All required fonts downloaded!');
 	}
-
-	// private async productionToken() {
-	//   const tokenReq = await this.req.getData(api.bundlejs);
-
-	//   if (!tokenReq.ok || !tokenReq.res) {
-	//     console.error('Failed to get Production Token!');
-	//     return { isOk: false, reason: new Error('Failed to get Production Token') };
-	//   }
-
-	//   const rawjs = await tokenReq.res.text();
-
-	//   const tokens = rawjs.match(/prod="([\w-]+:[\w-]+)"/);
-
-	//   if (!tokens) {
-	//     console.error('Failed to find Production Token in js!');
-	//     return { isOk: false, reason: new Error('Failed to find Production Token in js') };
-	//   }
-
-	//   return Buffer.from(tokens[1], 'latin1').toString('base64');
-	// }
 
 	public async doAuth(data: AuthData): Promise<AuthResponse> {
 		const basic = atob(api.basic_auth_token);
@@ -1106,7 +1084,7 @@ export default class Crunchy implements ServiceClass {
 		const showInfo = await showInfoReq.res.json();
 		await this.logObject(showInfo.data[0], 0);
 
-		let episodeList = { total: 0, data: [], meta: {} } as CrunchyEpisodeList;
+		let episodeList: CrunchyEpisodeList;
 		//get episode info CMS
 		const reqEpsCMSListOpts = [
 			api.cms_bucket,
@@ -1609,7 +1587,6 @@ export default class Crunchy implements ServiceClass {
 			};
 
 			//Get Media GUID
-			let mediaId = mMeta.mediaId;
 			if (mMeta.versions) {
 				if (mMeta.lang) {
 					currentVersion = mMeta.versions.find((a) => a.audio_locale == mMeta.lang?.cr_locale);
@@ -1624,11 +1601,7 @@ export default class Crunchy implements ServiceClass {
 					continue;
 				}
 				isPrimary = currentVersion.original;
-				mediaId = currentVersion?.media_guid;
 			}
-
-			// If for whatever reason mediaId has a :, return the ID only
-			if (mediaId.includes(':')) mediaId = mediaId.split(':')[1];
 
 			const compiledChapters: string[] = [];
 			if (options.chapters) {
@@ -2153,6 +2126,10 @@ export default class Crunchy implements ServiceClass {
 						});
 
 						videos.sort((a, b) => {
+							return a.bandwidth - b.bandwidth;
+						});
+
+						videos.sort((a, b) => {
 							return a.quality.width - b.quality.width;
 						});
 
@@ -2415,14 +2392,14 @@ export default class Crunchy implements ServiceClass {
 						) {
 							console.info('Decryption Needed, attempting to decrypt');
 							if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-								let commandBaseVideo = `--show-progress --key ${encryptionKeysVideo?.[0].kid}:${encryptionKeysVideo?.[0].key} `;
-								let commandBaseAudio = `--show-progress --key ${encryptionKeysAudio?.[0].kid}:${encryptionKeysAudio?.[0].key} `;
+								let commandBaseVideo = `--show-progress ${encryptionKeysVideo?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
+								let commandBaseAudio = `--show-progress ${encryptionKeysAudio?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
 								let commandVideo = commandBaseVideo + `"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
 								let commandAudio = commandBaseAudio + `"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
 
 								if (this.cfg.bin.shaka) {
-									commandBaseVideo = ` --enable_raw_key_decryption ${encryptionKeysVideo?.map((kb) => '--keys key_id=' + kb.kid + ':key=' + kb.key).join(' ')}`;
-									commandBaseAudio = ` --enable_raw_key_decryption ${encryptionKeysAudio?.map((kb) => '--keys key_id=' + kb.kid + ':key=' + kb.key).join(' ')}`;
+									commandBaseVideo = ` --enable_raw_key_decryption ${encryptionKeysVideo && encryptionKeysVideo.length > 0 ? `--keys "${encryptionKeysVideo.map((kb, i) => `label=KEY${i + 1}:key_id=${kb.kid}:key=${kb.key}`).join(',')}"` : ''}`;
+									commandBaseAudio = ` --enable_raw_key_decryption ${encryptionKeysAudio && encryptionKeysAudio.length > 0 ? `--keys "${encryptionKeysAudio.map((kb, i) => `label=KEY${i + 1}:key_id=${kb.kid}:key=${kb.key}`).join(',')}"` : ''}`;
 									commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"` + commandBaseVideo;
 									commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"` + commandBaseAudio;
 								}
@@ -2956,9 +2933,14 @@ export default class Crunchy implements ServiceClass {
 											sBody = sBody.replace(/^(PlayResY:\s*\d+)/m, `$1\nLayoutResX: ${playResX}\nLayoutResY: ${playResY}`);
 										}
 
-										// ScaleBorderAndShadow Fix
+										// ScaleBorderAndShadow Fix (True and doesn't exist)
 										if (options.scaledBorderAndShadowFix && !sBody.includes('ScaledBorderAndShadow')) {
 											sBody = sBody.replace(/^(WrapStyle:.*)$/m, `$1\nScaledBorderAndShadow: ${options.scaledBorderAndShadow}`);
+										}
+
+										// ScaleBorderAndShadow Fix (True and exists)
+										if (options.scaledBorderAndShadowFix && sBody.includes('ScaledBorderAndShadow')) {
+											sBody = sBody.replace(/ScaledBorderAndShadow:\s*(yes|no)/, `ScaledBorderAndShadow: ${options.scaledBorderAndShadow}`);
 										}
 
 										// Fix VLC wrong parsing if URL not avaiable
@@ -3130,21 +3112,18 @@ export default class Crunchy implements ServiceClass {
 		const bin = Merger.checkMerger(this.cfg.bin, options.mp4, options.forceMuxer);
 		// collect fonts info
 		// mergers
-		let isMuxed = false;
 		if (options.syncTiming) {
 			await merger.createDelays();
 		}
 		if (bin.MKVmerge) {
 			await merger.merge('mkvmerge', bin.MKVmerge);
-			isMuxed = true;
 		} else if (bin.FFmpeg) {
 			await merger.merge('ffmpeg', bin.FFmpeg);
-			isMuxed = true;
 		} else {
 			console.info('\nDone!\n');
 			return;
 		}
-		if (isMuxed && !options.nocleanup) merger.cleanUp();
+		if (!options.nocleanup) merger.cleanUp();
 	}
 
 	public async listSeriesID(
@@ -3371,7 +3350,7 @@ export default class Crunchy implements ServiceClass {
 					],
 					seriesTitle: itemE.items.find((a) => !a.series_title.match(/\(\w+ Dub\)/))?.series_title ?? itemE.items[0].series_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
 					seasonTitle: itemE.items.find((a) => !a.season_title.match(/\(\w+ Dub\)/))?.season_title ?? itemE.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
-					episodeNumber: item.episode,
+					episodeNumber: epNum,
 					episodeTitle: item.title,
 					seasonID: item.season_id,
 					season: item.season_number,
@@ -3501,8 +3480,7 @@ export default class Crunchy implements ServiceClass {
 		let episodeList = { total: 0, data: [], meta: {} } as CrunchyEpisodeList;
 		//get episode info
 		for (const s of showInfo.data) {
-			const original_id = s.versions?.find((v: { original: boolean }) => v.original)?.guid;
-			const id = original_id ? original_id : s.id;
+			const id = s.id;
 
 			//get episode info CMS
 			const reqEpsCMSListOpts = [

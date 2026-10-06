@@ -10,8 +10,6 @@ const domain = {
 };
 
 export type APIType = {
-	// Crunchyroll Vilos bundle.js
-	bundlejs: string;
 	// Crunchyroll API
 	basic_auth_token: string;
 	auth: string;
@@ -49,11 +47,8 @@ const api: APIType = {
 	//
 	//
 	// Crunchyroll
-	// Vilos bundle.js (where we can extract the basic token thats needed for the initial auth)
-	bundlejs: 'https://static.crunchyroll.com/vilos-v2/web/vilos/js/bundle.js',
-	//
 	// Crunchyroll API
-	basic_auth_token: 'ZWE5Y21xbHRscXl6eWFuMXZkeTQ6LV9ZQ3BBRDVnc3hDaU9IWnpSTGdJQ1I4Z09XWGlsUVI=',
+	basic_auth_token: 'dng1bThwOWZzYm16em15bnZnemo6Q2NjNXp6UkNxTDgtNWpVTDdJZFJRODU2Z0l6WlVZVk0=',
 	auth: `${domain.cr_api}/auth/v1/token`,
 	me: `${domain.cr_api}/accounts/v1/me`,
 	profile: `${domain.cr_api}/accounts/v1/me/profile`,
@@ -71,7 +66,7 @@ const api: APIType = {
 	cms_auth: `${domain.cr_api}/index/v2`,
 	//
 	// Crunchyroll Headers
-	crunchyDefUserAgent: 'Crunchyroll/ANDROIDTV/3.54.5_22304 (Android 12; en-US; SHIELD Android TV Build/SR1A.211012.001)',
+	crunchyDefUserAgent: 'Crunchyroll/ANDROIDTV/3.71.0_22359 (Android 12; en-US; SHIELD Android TV Build/SR1A.220624.014)',
 	crunchyDefHeader: {},
 	crunchyAuthHeader: {},
 	crunchyAuthRefreshHeader: {},

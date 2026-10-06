@@ -1,18 +1,8 @@
 import type { Configuration } from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import path from 'path';
-import type { Configuration as DevServerConfig } from 'webpack-dev-server';
 
-const config: Configuration & DevServerConfig = {
-	devServer: {
-		proxy: [
-			{
-				target: 'http://localhost:3000',
-				context: ['/public', '/private'],
-				ws: true
-			}
-		]
-	},
+const config: Configuration = {
 	entry: './src/index.tsx',
 	mode: 'production',
 	output: {
@@ -33,8 +23,8 @@ const config: Configuration & DevServerConfig = {
 					loader: 'babel-loader',
 					options: {
 						presets: [
-							'@babel/typescript',
-							'@babel/preset-react',
+							['@babel/typescript', { onlyRemoveTypeImports: false }],
+							['@babel/preset-react', { development: false }],
 							[
 								'@babel/preset-env',
 								{
